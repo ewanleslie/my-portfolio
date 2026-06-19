@@ -1,19 +1,14 @@
 :root {
-  --bg: #fafafa;
-  --surface: #ffffff;
-  --text: #1a1a1a;
-  --text-muted: #666666;
-  --border: #e5e5e5;
-  --accent: #2563eb;
-  --radius: 12px;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.08);
-  --max-width: 880px;
-}
-
-/* Light theme only — kept consistent so white artifacts blend in cleanly. */
-:root {
-  color-scheme: light;
+  --bg: #ffffff;
+  --navy: #0a1628;
+  --text: #0d1117;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --border-dashed: #d1d5db;
+  --radius: 10px;
+  --max-width: 760px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: "SF Mono", ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
 }
 
 * {
@@ -26,11 +21,38 @@ html {
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font);
   background: var(--bg);
   color: var(--text);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---- header stripe ---- */
+.top-stripe {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--navy);
+  z-index: 100;
+}
+
+/* ---- white fade overlay (click-to-navigate) ---- */
+.page-fade {
+  position: fixed;
+  inset: 0;
+  background: #ffffff;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 200;
+  transition: opacity 0.25s ease;
+}
+.page-fade.active {
+  opacity: 1;
+  pointer-events: all;
 }
 
 .container {
@@ -39,99 +61,205 @@ body {
   padding: 0 24px;
 }
 
-/* Header */
-.site-header {
-  padding: 80px 0 40px;
+/* ---- hero ---- */
+.hero {
+  padding-top: 120px;
+  padding-bottom: 64px;
 }
 
 .site-title {
-  font-size: 2.5rem;
-  font-weight: 700;
-  margin: 0 0 8px;
+  margin: 0;
+  font-size: 56px;
+  font-weight: 800;
   letter-spacing: -0.02em;
+  line-height: 1.05;
+  color: var(--text);
+  opacity: 0;
+  transform: translateY(20px);
+  animation: rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.title-underline {
+  display: block;
+  width: 48px;
+  height: 2px;
+  margin-top: 20px;
+  background: var(--navy);
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: draw 0.4s ease forwards;
+  animation-delay: 0.3s;
 }
 
 .site-tagline {
-  font-size: 1.125rem;
-  color: var(--text-muted);
-  margin: 0;
+  max-width: 520px;
+  margin: 24px 0 0;
+  font-size: 18px;
+  color: var(--muted);
+  opacity: 0;
+  transform: translateY(20px);
+  animation: rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: 0.15s;
 }
 
-/* Projects */
-.section-title {
-  font-size: 1rem;
+@keyframes rise {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes draw {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* ---- projects ---- */
+.section-label {
+  margin: 0 0 28px;
+  padding-left: 8px;
+  border-left: 3px solid var(--navy);
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-  margin: 24px 0 20px;
+  letter-spacing: 0.15em;
+  color: var(--navy);
 }
 
 .project-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 20px;
-  padding-bottom: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 90px;
+}
+
+/* reveal wrapper handles the scroll-in animation (kept separate from
+   the card's own hover transform so the two never fight) */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.55s ease, transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal.in-view {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .card {
-  display: flex;
-  flex-direction: column;
-  background: var(--surface);
+  position: relative;
+  display: block;
+  padding: 28px;
+  background: #ffffff;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 24px;
-  box-shadow: var(--shadow);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-hover);
+a.card {
+  cursor: pointer;
+}
+a.card:hover {
+  transform: translateY(-4px);
+  border-color: var(--navy);
+  box-shadow: 0 12px 30px rgba(10, 22, 40, 0.12);
+}
+
+.card-num {
+  display: block;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  color: var(--navy);
+  opacity: 0.35;
 }
 
 .card-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin: 0 0 8px;
+  margin: 12px 0 8px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
 }
 
-.card-description {
-  color: var(--text-muted);
+.card-desc {
   margin: 0 0 20px;
-  flex-grow: 1;
+  font-size: 15px;
+  color: var(--muted);
 }
 
 .card-link {
-  align-self: flex-start;
-  font-weight: 500;
-  color: var(--accent);
-  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+  opacity: 0.72;
+  transition: opacity 0.2s ease;
+}
+a.card:hover .card-link {
+  opacity: 1;
+}
+.card-link .arrow {
+  transition: transform 0.2s ease;
+}
+a.card:hover .card-link .arrow {
+  transform: translateX(4px);
 }
 
-.card-link:hover {
-  text-decoration: underline;
+/* ---- coming-soon cards ---- */
+.card--soon {
+  border-style: dashed;
+  border-color: var(--border-dashed);
+}
+.card--soon .card-num {
+  color: var(--muted);
+  opacity: 0.5;
+}
+.card--soon .card-title,
+.card--soon .card-desc {
+  color: var(--muted);
+}
+.card--soon .card-link {
+  color: var(--muted);
+  opacity: 0.8;
 }
 
-.card-link::after {
-  content: " →";
-}
-
-.empty-state {
-  color: var(--text-muted);
-  grid-column: 1 / -1;
-  text-align: center;
-  padding: 40px 0;
-}
-
-/* Footer */
+/* ---- footer ---- */
 .site-footer {
   border-top: 1px solid var(--border);
-  padding: 32px 0;
-  color: var(--text-muted);
-  font-size: 0.9rem;
+  padding: 28px 0;
 }
-
 .site-footer p {
   margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.copyright-symbol {
+  color: var(--navy);
+  font-weight: 600;
+}
+
+/* ---- reduced motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  .site-title,
+  .site-tagline,
+  .title-underline {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .card,
+  .card-link,
+  .card-link .arrow {
+    transition: none;
+  }
 }
