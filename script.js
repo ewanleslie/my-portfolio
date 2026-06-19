@@ -6,22 +6,10 @@
 //   linkLabel   - optional custom text for the link (defaults to "View project")
 const projects = [
   {
-    title: "Three-Statement Studio",
+    title: "Accounting Trainer Tool",
     description: "Interactive model explorer and quiz covering income statement, balance sheet, cash flow, and supporting schedules.",
     url: "/three-statement-studio/index.html",
     linkLabel: "Open studio",
-  },
-  {
-    title: "Example Project",
-    description: "A short description of what this project does and why it's interesting.",
-    url: "https://example.com",
-    linkLabel: "View project",
-  },
-  {
-    title: "Another Project",
-    description: "Replace these placeholders with your own work. Add as many as you like.",
-    url: "https://github.com/yourname/project",
-    linkLabel: "View on GitHub",
   },
 ];
 
