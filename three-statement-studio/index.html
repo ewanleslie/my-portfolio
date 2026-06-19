@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Three-Statement Studio</title>
+  <style>
+    html, body, #root { margin: 0; padding: 0; height: 100%; }
+    body { background: #f4f6f9; }
+  </style>
+  <!-- React, ReactDOM, Babel from CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="react">
+const { useState, useMemo } = React;
+
+/* ============================================================
+   THREE-STATEMENT STUDIO  ·  v2
+   Theme modeled on the Macro Strategy dashboard:
+     bg        #f4f6f9   app background
+     sidebar   #fbfcfd   rail
+     card      #ffffff   surfaces
+     border    #e6e9ee   hairlines
+     ink       #1f2937   primary text
+     slate     #5b6673   secondary
+     mist      #8a929c   tertiary / labels
+     blue      #2f6fb0   primary accent (selected nav, links)
+     blueSoft  #eaf1f8   selected nav bg
+     pos       #2f8a5b   green / increase
+     posSoft   #e8f3ec
+     neg       #c0504a   red / decrease
+     negSoft   #f7ebea
+     amber     #b5862f   category / caution
+   ============================================================ */
+const C = {
+  bg: "#f4f6f9", sidebar: "#fbfcfd", card: "#ffffff", border: "#e6e9ee",
+  ink: "#1f2937", slate: "#5b6673", mist: "#8a929c",
+  blue: "#2f6fb0", blueSoft: "#eaf1f8", blueLine: "#cfe0f0",
+  pos: "#2f8a5b", posSoft: "#e8f3ec", posLine: "#cfe6d8",
+  neg: "#c0504a", negSoft: "#f7ebea", negLine: "#ecd4d2",
+  amber: "#b5862f",
+};
+const sans = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+const mono = "'SF Mono', ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace";
+
+const STMT = {
+  is: { name: "Income Statement", abbr: "IS", color: C.blue },
+  bs: { name: "Balance Sheet", abbr: "BS", color: C.amber },
+  cf: { name: "Cash Flow", abbr: "CF", color: "#5f6b94" },
+  dep: { name: "Depreciation Schedule", abbr: "DEP", color: "#5b6673" },
+  debt: { name: "Debt Schedule", abbr: "DEBT", color: "#5b6673" },
+};
+
+/* ------------------------------------------------------------
+   ITEM DICTIONARY — descriptions + linkages (for explorer)
+   ------------------------------------------------------------ */
+const ITEMS = {
+  // Income statement
+  revenue: { stmt: "is", label: "Revenue", desc: "Sales recognized in the period. The top line and primary driver for AR and most downstream items.", links: ["cogs", "ar", "grossProfit"] },
+  cogs: { stmt: "is", label: "Cost of goods sold", desc: "Direct cost of products sold. Relieved out of inventory; Revenue − COGS = Gross profit.", links: ["revenue", "inventory", "grossProfit"] },
+  grossProfit: { stmt: "is", label: "Gross profit", desc: "Revenue less COGS. A subtotal, not an input.", sum: true, links: ["revenue", "cogs", "ebit"] },
+  sga: { stmt: "is", label: "Selling, general & admin", desc: "Operating overhead excluding D&A. The unpaid portion accrues into accrued liabilities.", links: ["ebit", "accrued"] },
+  rnd: { stmt: "is", label: "Research & development", desc: "Expensed R&D under US GAAP. Operating cost above EBIT.", links: ["ebit"] },
+  da: { stmt: "is", label: "Depreciation & amortization", desc: "Non-cash expense from the depreciation schedule. Reduces pre-tax income and is added back in CFO.", links: ["ebit", "ppeNet", "depExp", "cfDa"] },
+  ebit: { stmt: "is", label: "Operating income (EBIT)", desc: "Gross profit less SG&A, R&D and D&A.", sum: true, links: ["grossProfit", "sga", "rnd", "da", "interest"] },
+  interest: { stmt: "is", label: "Interest expense", desc: "Cost of debt from the debt schedule (balance × rate).", links: ["ebit", "debtInt", "pretax"] },
+  pretax: { stmt: "is", label: "Pre-tax income", desc: "EBIT less interest expense.", sum: true, links: ["ebit", "interest", "taxes"] },
+  taxes: { stmt: "is", label: "Income tax expense", desc: "Pre-tax income × effective rate. Cash portion hits CFO; deferred portion hits DTLs.", links: ["pretax", "netIncome"] },
+  netIncome: { stmt: "is", label: "Net income", desc: "Bottom line. Flows to retained earnings on the balance sheet and starts the cash flow statement.", sum: true, total: true, links: ["taxes", "retained", "cfNi"] },
+
+  // Balance sheet — assets
+  cash: { stmt: "bs", label: "Cash & equivalents", desc: "Ending cash from the cash flow statement — the plug that ties the model together.", links: ["cfEnd"] },
+  ar: { stmt: "bs", label: "Accounts receivable", desc: "Revenue billed but uncollected. An increase is a use of cash.", links: ["revenue", "cfWc"] },
+  inventory: { stmt: "bs", label: "Inventory", desc: "Goods held for sale; relieved through COGS. An increase is a use of cash.", links: ["cogs", "cfWc"] },
+  prepaid: { stmt: "bs", label: "Prepaid expenses", desc: "Costs paid in advance. An increase is a use of cash.", links: ["cfWc"] },
+  caTotal: { stmt: "bs", label: "Total current assets", desc: "Cash + AR + inventory + prepaids.", sum: true, links: ["cash", "ar", "inventory", "prepaid", "assetsTotal"] },
+  ppeGross: { stmt: "bs", label: "Gross PP&E", desc: "Cumulative capex before depreciation. From the depreciation schedule.", links: ["depGrossEnd", "ppeNet"] },
+  accDep: { stmt: "bs", label: "Accumulated depreciation", desc: "Cumulative D&A taken against PP&E. A contra-asset.", links: ["depAccEnd", "ppeNet"] },
+  ppeNet: { stmt: "bs", label: "Net PP&E", desc: "Gross PP&E less accumulated depreciation. Rises with capex, falls with D&A.", sum: true, links: ["ppeGross", "accDep", "da", "depNetEnd", "assetsTotal"] },
+  goodwill: { stmt: "bs", label: "Goodwill & intangibles", desc: "Acquisition premium and intangibles, tested for impairment.", links: ["assetsTotal"] },
+  assetsTotal: { stmt: "bs", label: "Total assets", desc: "Current assets + net PP&E + goodwill. Must equal total liabilities + equity.", sum: true, total: true, links: ["caTotal", "ppeNet", "goodwill", "leTotal"] },
+  // Balance sheet — liabilities & equity
+  ap: { stmt: "bs", label: "Accounts payable", desc: "Owed to suppliers. An increase is a source of cash.", links: ["cfWc"] },
+  accrued: { stmt: "bs", label: "Accrued liabilities", desc: "Incurred but unpaid expenses (e.g. part of SG&A). An increase is a source of cash.", links: ["sga", "cfWc"] },
+  clTotal: { stmt: "bs", label: "Total current liabilities", desc: "AP + accrued liabilities.", sum: true, links: ["ap", "accrued", "leTotal"] },
+  debtBal: { stmt: "bs", label: "Long-term debt", desc: "Interest-bearing borrowings from the debt schedule. Drives interest expense.", links: ["debtEnd", "interest", "cfDebt", "leTotal"] },
+  commonStock: { stmt: "bs", label: "Common stock & APIC", desc: "Capital contributed by shareholders.", links: ["leTotal"] },
+  retained: { stmt: "bs", label: "Retained earnings", desc: "Prior retained earnings + net income − dividends.", links: ["netIncome", "dividends", "leTotal"] },
+  leTotal: { stmt: "bs", label: "Total liabilities & equity", desc: "Current liabilities + debt + equity. Must equal total assets.", sum: true, total: true, links: ["clTotal", "debtBal", "commonStock", "retained", "assetsTotal"] },
+
+  // Cash flow
+  cfNi: { stmt: "cf", label: "Net income", desc: "CFO begins with net income.", links: ["netIncome"] },
+  cfDa: { stmt: "cf", label: "(+) Depreciation & amort.", desc: "Non-cash; added back to reconcile to cash.", links: ["da"] },
+  cfWc: { stmt: "cf", label: "(±) Change in working capital", desc: "Δ in AR, inventory, prepaids, AP, accrued. Asset increases use cash; liability increases provide cash.", links: ["ar", "inventory", "prepaid", "ap", "accrued"] },
+  cfo: { stmt: "cf", label: "Cash from operations", desc: "Net income + D&A ± working capital.", sum: true, links: ["cfNi", "cfDa", "cfWc", "cfEnd"] },
+  cfCapex: { stmt: "cf", label: "Capital expenditures", desc: "Cash spent on PP&E. A use of cash that raises gross PP&E.", links: ["ppeGross", "depCapex"] },
+  cfi: { stmt: "cf", label: "Cash from investing", desc: "Primarily capex.", sum: true, links: ["cfCapex", "cfEnd"] },
+  cfDebt: { stmt: "cf", label: "Debt issuance / (repayment)", desc: "Financing flows that change the debt balance.", links: ["debtBal", "debtRepay"] },
+  dividends: { stmt: "cf", label: "Dividends paid", desc: "Cash returned to shareholders; reduces retained earnings.", links: ["retained"] },
+  cff: { stmt: "cf", label: "Cash from financing", desc: "Debt flows + dividends + equity.", sum: true, links: ["cfDebt", "dividends", "cfEnd"] },
+  cfEnd: { stmt: "cf", label: "Net change in cash", desc: "CFO + CFI + CFF, added to beginning cash to give ending cash on the balance sheet.", sum: true, total: true, links: ["cfo", "cfi", "cff", "cash"] },
+
+  // Depreciation schedule
+  depGrossBeg: { stmt: "dep", label: "Beginning gross PP&E", desc: "Opening cumulative capex.", links: ["depGrossEnd"] },
+  depCapex: { stmt: "dep", label: "(+) Capital expenditures", desc: "Period additions to PP&E.", links: ["cfCapex", "depGrossEnd"] },
+  depGrossEnd: { stmt: "dep", label: "Ending gross PP&E", desc: "Beginning gross + capex. Carries to the balance sheet.", sum: true, links: ["depGrossBeg", "depCapex", "ppeGross"] },
+  depAccBeg: { stmt: "dep", label: "Beginning accumulated dep.", desc: "Opening accumulated depreciation.", links: ["depAccEnd"] },
+  depExp: { stmt: "dep", label: "(+) Depreciation expense", desc: "Period depreciation, e.g. straight-line over useful life. Feeds D&A on the income statement.", links: ["da", "depAccEnd"] },
+  depAccEnd: { stmt: "dep", label: "Ending accumulated dep.", desc: "Beginning accumulated + period expense. Carries to the balance sheet contra-asset.", sum: true, links: ["depAccBeg", "depExp", "accDep"] },
+  depNetEnd: { stmt: "dep", label: "Ending net PP&E", desc: "Ending gross less ending accumulated depreciation.", sum: true, total: true, links: ["depGrossEnd", "depAccEnd", "ppeNet"] },
+
+  // Debt schedule
+  debtBeg: { stmt: "debt", label: "Beginning balance", desc: "Opening debt balance.", links: ["debtEnd"] },
+  debtMand: { stmt: "debt", label: "(−) Mandatory amortization", desc: "Contractual scheduled principal repayment.", links: ["debtEnd", "debtRepay"] },
+  debtSweep: { stmt: "debt", label: "(−) Cash sweep", desc: "Optional prepayment from excess free cash flow.", links: ["debtEnd", "debtRepay"] },
+  debtEnd: { stmt: "debt", label: "Ending balance", desc: "Beginning − mandatory − sweep. Carries to the balance sheet.", sum: true, total: true, links: ["debtBeg", "debtMand", "debtSweep", "debtBal"] },
+  debtRepay: { stmt: "debt", label: "Total repayment", desc: "Mandatory + sweep, flows to financing on the cash flow statement.", sum: true, links: ["debtMand", "debtSweep", "cfDebt"] },
+  debtRate: { stmt: "debt", label: "Interest rate", desc: "Applied to the average (or beginning) balance to compute interest.", links: ["debtInt"] },
+  debtInt: { stmt: "debt", label: "Interest expense", desc: "Balance × rate. Feeds interest expense on the income statement.", sum: true, links: ["debtBal", "debtRate", "interest"] },
+};
+
+/* ------------------------------------------------------------
+   STATEMENT LAYOUTS — ordered rows w/ illustrative values
+   type: 'head' section label · 'item' normal · 'sum' subtotal (top rule)
+         'total' grand total (double rule) · 'spacer'
+   ------------------------------------------------------------ */
+const IS_LAYOUT = [
+  { id: "revenue", v: 1000 },
+  { id: "cogs", v: -600 },
+  { id: "grossProfit", v: 400 },
+  { id: "sga", v: -150 },
+  { id: "rnd", v: -40 },
+  { id: "da", v: -60 },
+  { id: "ebit", v: 150 },
+  { id: "interest", v: -28 },
+  { id: "pretax", v: 122 },
+  { id: "taxes", v: -31 },
+  { id: "netIncome", v: 91 },
+];
+const BS_LAYOUT = [
+  { head: "Assets" },
+  { id: "cash", v: 130 },
+  { id: "ar", v: 150 },
+  { id: "inventory", v: 200 },
+  { id: "prepaid", v: 20 },
+  { id: "caTotal", v: 500 },
+  { id: "ppeGross", v: 800 },
+  { id: "accDep", v: -260 },
+  { id: "ppeNet", v: 540 },
+  { id: "goodwill", v: 120 },
+  { id: "assetsTotal", v: 1160 },
+  { head: "Liabilities & Equity" },
+  { id: "ap", v: 110 },
+  { id: "accrued", v: 70 },
+  { id: "clTotal", v: 180 },
+  { id: "debtBal", v: 380 },
+  { id: "commonStock", v: 200 },
+  { id: "retained", v: 400 },
+  { id: "leTotal", v: 1160 },
+];
+const CF_LAYOUT = [
+  { head: "Operating" },
+  { id: "cfNi", v: 91 },
+  { id: "cfDa", v: 60 },
+  { id: "cfWc", v: -22 },
+  { id: "cfo", v: 129 },
+  { head: "Investing" },
+  { id: "cfCapex", v: -80 },
+  { id: "cfi", v: -80 },
+  { head: "Financing" },
+  { id: "cfDebt", v: -20 },
+  { id: "dividends", v: -15 },
+  { id: "cff", v: -35 },
+  { id: "cfEnd", v: 14 },
+];
+const DEP_LAYOUT = [
+  { id: "depGrossBeg", v: 720 },
+  { id: "depCapex", v: 80 },
+  { id: "depGrossEnd", v: 800 },
+  { spacer: true },
+  { id: "depAccBeg", v: 200 },
+  { id: "depExp", v: 60 },
+  { id: "depAccEnd", v: 260 },
+  { spacer: true },
+  { id: "depNetEnd", v: 540 },
+];
+const DEBT_LAYOUT = [
+  { id: "debtBeg", v: 400 },
+  { id: "debtMand", v: -12 },
+  { id: "debtSweep", v: -8 },
+  { id: "debtEnd", v: 380 },
+  { spacer: true },
+  { id: "debtRepay", v: -20 },
+  { id: "debtRate", v: null, note: "7.0%" },
+  { id: "debtInt", v: 28 },
+];
+
+const STATEMENTS = {
+  is: { layout: IS_LAYOUT, meta: STMT.is },
+  bs: { layout: BS_LAYOUT, meta: STMT.bs },
+  cf: { layout: CF_LAYOUT, meta: STMT.cf },
+  dep: { layout: DEP_LAYOUT, meta: STMT.dep },
+  debt: { layout: DEBT_LAYOUT, meta: STMT.debt },
+};
+
+function fmt(n) {
+  if (n === null || n === undefined) return "";
+  if (n === 0) return "—";
+  const s = Math.abs(n).toLocaleString();
+  return n < 0 ? `(${s})` : s;
+}
+
+/* ============================================================
+   STATEMENT TABLE — shared renderer
+   props:
+     stmtKey
+     mode: 'explore' | 'quiz'
+     selected, onSelect           (explore)
+     answers                      (quiz: {id: {sign:1|-1, mag:string}})
+     onSign, onMag                (quiz handlers)
+     checked, answerKey           (quiz grading; signed dollar values)
+     hintId                       (quiz: id to pulse)
+   ============================================================ */
+function StatementTable(props) {
+  const { stmtKey, mode = "explore", selected, onSelect, answers = {}, onSign, onMag, checked, answerKey = {}, hintId } = props;
+  const { layout, meta } = STATEMENTS[stmtKey];
+
+  return (
+    <div style={{
+      background: C.card, border: `1px solid ${C.border}`, borderRadius: 12,
+      overflow: "hidden",
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", gap: 8,
+        padding: "12px 16px", borderBottom: `1px solid ${C.border}`,
+      }}>
+        <span style={{ width: 8, height: 8, borderRadius: 2, background: meta.color }} />
+        <span style={{ fontFamily: sans, fontSize: 12.5, fontWeight: 600, color: C.ink, letterSpacing: 0.2 }}>{meta.name}</span>
+      </div>
+      <div style={{ padding: "6px 8px 10px" }}>
+        {layout.map((row, i) => {
+          if (row.head) return (
+            <div key={i} style={{
+              fontFamily: sans, fontSize: 10.5, fontWeight: 700, letterSpacing: 0.7,
+              textTransform: "uppercase", color: C.mist, padding: "12px 8px 4px",
+            }}>{row.head}</div>
+          );
+          if (row.spacer) return <div key={i} style={{ height: 8 }} />;
+
+          const it = ITEMS[row.id];
+          const isSum = it.sum;
+          const isTotal = it.total;
+          const ans = answers[row.id];           // explore: unused. quiz: {sign, mag} or undefined
+          const signedAns = mode === "quiz" && ans ? (ans.mag === "" ? null : ans.sign * Number(ans.mag)) : null;
+          const isSelected = mode === "explore" && selected === row.id;
+          const isLinked = mode === "explore" && selected && (
+            ITEMS[selected].links.includes(row.id) ||
+            (ITEMS[row.id].links || []).includes(selected)
+          );
+          const isHint = hintId === row.id;
+
+          // quiz grading: compare signed value to key (absent key => expected 0)
+          const expected = answerKey[row.id] !== undefined ? answerKey[row.id] : 0;
+          const userVal = signedAns === null ? 0 : signedAns;
+          const isCorrect = checked ? Math.abs(userVal - expected) < 1e-9 : false;
+          // a row is "in play" for grading if it has a key entry OR the user touched it
+          const graded = checked && (answerKey[row.id] !== undefined || (ans && ans.mag !== "" && ans.mag !== undefined));
+
+          let rowBg = "transparent", rowBorder = "transparent";
+          if (mode === "explore") {
+            rowBg = isSelected ? C.blueSoft : isLinked ? "#f3f7fb" : "transparent";
+            rowBorder = isSelected ? C.blueLine : "transparent";
+          } else if (mode === "quiz") {
+            if (graded) { rowBg = isCorrect ? C.posSoft : C.negSoft; rowBorder = isCorrect ? C.posLine : C.negLine; }
+            else if (signedAns !== null) { rowBg = signedAns >= 0 ? C.posSoft : C.negSoft; rowBorder = signedAns >= 0 ? C.posLine : C.negLine; }
+          }
+
+          return (
+            <div key={i}>
+              <div
+                onClick={() => { if (mode === "explore") onSelect(isSelected ? null : row.id); }}
+                style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "5px 8px", borderRadius: 5, cursor: mode === "explore" ? "pointer" : "default",
+                  background: rowBg,
+                  border: `1px solid ${rowBorder}`,
+                  borderTop: isSum ? `1px solid ${C.border}` : undefined,
+                  marginTop: isSum ? 2 : 0,
+                  outline: isHint ? `2px solid ${C.amber}` : "none",
+                  outlineOffset: isHint ? -1 : 0,
+                  transition: "background .12s, border-color .12s",
+                }}
+              >
+                <span style={{
+                  fontFamily: sans, fontSize: 12.5,
+                  fontWeight: isTotal ? 700 : isSum ? 600 : 400,
+                  color: isTotal ? C.ink : isSum ? C.ink : C.slate,
+                  display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0,
+                }}>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.label}</span>
+                </span>
+
+                {mode === "explore" && (
+                  <span style={{
+                    fontFamily: mono, fontSize: 12,
+                    fontWeight: isTotal ? 700 : isSum ? 600 : 400,
+                    color: row.v < 0 ? C.neg : (isTotal || isSum ? C.ink : C.slate),
+                    position: "relative",
+                  }}>
+                    {row.note ? row.note : fmt(row.v)}
+                    {isTotal && (
+                      <span style={{ position: "absolute", left: 0, right: 0, bottom: -3, borderBottom: `1px solid ${C.ink}` }} />
+                    )}
+                  </span>
+                )}
+
+                {mode === "quiz" && (
+                  <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    {/* sign toggle */}
+                    <button
+                      disabled={checked}
+                      onClick={() => onSign(row.id)}
+                      style={{
+                        fontFamily: mono, fontSize: 13, fontWeight: 700, width: 24, height: 26,
+                        border: `1px solid ${ans ? (ans.sign > 0 ? C.posLine : C.negLine) : C.border}`,
+                        background: ans ? (ans.sign > 0 ? C.posSoft : C.negSoft) : C.card,
+                        color: ans ? (ans.sign > 0 ? C.pos : C.neg) : C.mist,
+                        borderRadius: 5, cursor: checked ? "default" : "pointer", padding: 0,
+                      }}
+                    >{ans ? (ans.sign > 0 ? "+" : "–") : "±"}</button>
+                    {/* magnitude input */}
+                    <input
+                      type="text" inputMode="decimal"
+                      disabled={checked}
+                      value={ans ? ans.mag : ""}
+                      placeholder="0"
+                      onChange={(e) => onMag(row.id, e.target.value)}
+                      style={{
+                        fontFamily: mono, fontSize: 12, width: 52, height: 26, textAlign: "right",
+                        border: `1px solid ${graded ? (isCorrect ? C.posLine : C.negLine) : C.border}`,
+                        background: checked ? (isCorrect ? C.posSoft : C.negSoft) : C.card,
+                        color: C.ink, borderRadius: 5, padding: "0 6px", outline: "none",
+                      }}
+                    />
+                    {checked && (
+                      <span style={{
+                        fontFamily: mono, fontSize: 11, fontWeight: 700, width: 44, textAlign: "right",
+                        color: isCorrect ? C.pos : C.neg,
+                      }}>
+                        {isCorrect ? "✓" : (expected === 0 ? "0" : (expected > 0 ? "+" : "") + expected)}
+                      </span>
+                    )}
+                  </span>
+                )}
+              </div>
+
+
+              {/* inline description directly under selected row (explore mode) */}
+              {mode === "explore" && isSelected && (
+                <div style={{
+                  margin: "2px 8px 6px", padding: "10px 12px",
+                  background: C.blueSoft, border: `1px solid ${C.blueLine}`, borderRadius: 7,
+                }}>
+                  <p style={{ fontFamily: sans, fontSize: 12, color: C.slate, lineHeight: 1.5, margin: 0 }}>{it.desc}</p>
+                  <div style={{ fontFamily: sans, fontSize: 11, color: C.mist, marginTop: 6 }}>
+                    Linked:{" "}
+                    {linkedSet(selected).map((k, j, arr) => (
+                      <span key={k} style={{ color: STMT[ITEMS[k].stmt].color, fontWeight: 500 }}>
+                        {ITEMS[k].label}{j < arr.length - 1 ? " · " : ""}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function linkedSet(id) {
+  const s = new Set(ITEMS[id].links || []);
+  Object.entries(ITEMS).forEach(([k, v]) => { if ((v.links || []).includes(id)) s.add(k); });
+  return [...s];
+}
+
+/* ============================================================
+   MODEL EXPLORER
+   ============================================================ */
+function ModelExplorer() {
+  const [sel, setSel] = useState(null);
+  return (
+    <div>
+      <Header title="Model Explorer"
+        sub="Click any line to read its role and trace its linkages. Subtotals carry a rule above; totals are double-underlined, as on a real statement." />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginBottom: 16 }}>
+        <StatementTable stmtKey="is" selected={sel} onSelect={setSel} />
+        <StatementTable stmtKey="cf" selected={sel} onSelect={setSel} />
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <StatementTable stmtKey="bs" selected={sel} onSelect={setSel} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+        <StatementTable stmtKey="dep" selected={sel} onSelect={setSel} />
+        <StatementTable stmtKey="debt" selected={sel} onSelect={setSel} />
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   IMPACT QUIZ — adjust the real statements yourself
+   key maps item id -> SIGNED DOLLAR CHANGE to the line's
+   displayed value (expenses shown negative, so more expense
+   is a more-negative change). Items absent from the key must
+   stay at 0. Lines explicitly set to 0 are "traps" — they look
+   like they should move but don't.
+   ============================================================ */
+const IMPACT = [
+  {
+    q: "Depreciation expense increases by $10. Ignore taxes.",
+    key: { da: -10, ebit: -10, pretax: -10, netIncome: -10,
+           accDep: -10, ppeNet: -10, assetsTotal: -10, retained: -10, leTotal: -10,
+           cfNi: -10, cfDa: 10, cfo: 0, cfEnd: 0, cash: 0,
+           depExp: 10, depAccEnd: 10, depNetEnd: -10 },
+    why: "Higher D&A of $10 lowers EBIT, pre-tax and net income by $10, so retained earnings falls $10. Accumulated depreciation (a contra-asset) rises $10, cutting net PP&E and total assets by $10 — both sides of the balance sheet fall by the same $10. D&A is non-cash: the $10 net income hit is exactly added back in CFO, so CFO, net change in cash and cash are all unchanged. On the schedule, depreciation expense and accumulated depreciation rise $10 and net PP&E falls $10.",
+    note: "An expense with no cash out. The contra-asset (accumulated depreciation) rises, and the CFO add-back offsets the net income hit exactly.",
+  },
+  {
+    q: "Depreciation expense increases by $10, tax rate 25%. Enter each line's change by its value as shown.",
+    key: { da: -10, ebit: -10, pretax: -10, taxes: 2.5, netIncome: -7.5,
+           accDep: -10, ppeNet: -10, assetsTotal: -7.5, retained: -7.5, leTotal: -7.5,
+           cfNi: -7.5, cfDa: 10, cfo: 2.5, cfEnd: 2.5, cash: 2.5,
+           depExp: 10, depAccEnd: 10, depNetEnd: -10 },
+    why: "Pre-tax income falls $10. The tax expense line shrinks by $2.50 (it's shown negative, so a +2.5 change to the line), and net income falls by the after-tax $7.50, lowering retained earnings $7.50. Net PP&E falls $10 but the $2.50 cash tax saving lifts cash, so total assets net to −$7.50, matching equity. CFO rises $2.50 ( −$7.50 NI + $10 add-back ), so cash rises $2.50. That $2.50 is the depreciation tax shield — the only reason cash moves.",
+    note: "Net PP&E falls $10, but cash rises by the $2.50 tax shield, so total assets fall only $7.50 — matching the after-tax hit to equity.",
+  },
+  {
+    q: "A customer is billed $20 on credit — revenue earned, cash not yet collected. Ignore taxes.",
+    key: { revenue: 20, grossProfit: 20, ebit: 20, pretax: 20, netIncome: 20,
+           ar: 20, caTotal: 20, assetsTotal: 20, retained: 20, leTotal: 20,
+           cfNi: 20, cfWc: -20, cfo: 0, cfEnd: 0, cash: 0 },
+    why: "Revenue of $20 flows down to net income and retained earnings (+$20). No cash collected — AR builds $20, lifting current and total assets. In CFO, the +$20 net income is exactly offset by the $20 AR build (a working-capital use of −$20), so CFO, net change in cash and cash are unchanged.",
+    note: "Net income is up $20 but no cash arrived. AR absorbs it, and the AR build offsets net income in CFO.",
+  },
+  {
+    q: "$15 of inventory is purchased on account (accounts payable), no cash paid.",
+    key: { inventory: 15, caTotal: 15, assetsTotal: 15,
+           ap: 15, clTotal: 15, leTotal: 15,
+           cfWc: 0, cfo: 0, cfEnd: 0, cash: 0 },
+    why: "Inventory (asset) and accounts payable (liability) both rise $15 — assets and liabilities grow together, equity unchanged, balance sheet still ties. No income effect. In CFO the $15 inventory build (use) and $15 AP build (source) offset exactly, so working capital and cash are unchanged.",
+    note: "Two lines move on opposite sides of the balance sheet, $15 each. No income, no cash, and the two CFO working-capital effects cancel.",
+  },
+  {
+    q: "$15 of inventory is sold for $25 cash. Ignore taxes.",
+    key: { revenue: 25, cogs: -15, grossProfit: 10, ebit: 10, pretax: 10, netIncome: 10,
+           cash: 25, inventory: -15, caTotal: 10, assetsTotal: 10, retained: 10, leTotal: 10,
+           cfNi: 10, cfWc: 15, cfo: 25, cfEnd: 25 },
+    why: "Revenue $25 and COGS $15 give +$10 to gross profit through net income and retained earnings. Cash rises $25 while inventory falls $15, a net +$10 to current and total assets. In CFO, +$10 net income plus the $15 inventory release (a working-capital source) sums to the +$25 cash inflow.",
+    note: "COGS is shown negative — selling inventory raises COGS by $15 (a −15 change). Cash +$25, inventory −$15, so assets net +$10.",
+  },
+  {
+    q: "$30 of capital expenditure is paid in cash.",
+    key: { cash: -30, ppeGross: 30, ppeNet: 30, caTotal: -30, assetsTotal: 0,
+           cfCapex: -30, cfi: -30, cfEnd: -30,
+           depGrossEnd: 30, depCapex: 30, depNetEnd: 30 },
+    why: "Gross and net PP&E rise $30 while cash falls $30 — current assets fall $30, PP&E rises $30, so total assets are unchanged. No income effect. Capex is an investing outflow, so CFI and net change in cash fall $30. On the depreciation schedule, capex lifts ending gross and net PP&E by $30.",
+    note: "One asset converts into another: cash −$30, PP&E +$30. Total assets are flat, but current assets and net PP&E each move.",
+  },
+  {
+    q: "$40 dividend is declared and paid in cash.",
+    key: { cash: -40, caTotal: -40, assetsTotal: -40, retained: -40, leTotal: -40,
+           dividends: -40, cff: -40, cfEnd: -40 },
+    why: "Dividends reduce retained earnings (equity) and cash (assets) by $40 — both sides fall, balance sheet still ties. No income statement effect. It's a financing outflow, lowering CFF and net change in cash by $40.",
+    note: "Dividends never touch the income statement. Cash and equity both fall $40, and it flows through financing.",
+  },
+  {
+    q: "$50 of debt principal is repaid in cash (treat as mandatory amortization).",
+    key: { cash: -50, caTotal: -50, assetsTotal: -50, debtBal: -50, leTotal: -50,
+           cfDebt: -50, cff: -50, cfEnd: -50,
+           debtMand: -50, debtEnd: -50, debtRepay: -50 },
+    why: "Cash and debt both fall $50 — assets down $50, liabilities down $50, equity flat. Principal repayment is a financing outflow (not an expense), so CFF and net change in cash fall $50. On the debt schedule, mandatory amortization rises (a −50 change to that line) and the ending balance falls $50.",
+    note: "Principal repayment is financing, not an expense — net income is untouched. Cash and debt each fall $50.",
+  },
+  {
+    q: "Accrue $5 of interest expense that has not yet been paid in cash. Ignore taxes.",
+    key: { interest: -5, pretax: -5, netIncome: -5,
+           accrued: 5, clTotal: 5, retained: -5, assetsTotal: 0, leTotal: 0,
+           cfNi: -5, cfWc: 5, cfo: 0, cfEnd: 0, cash: 0 },
+    why: "Interest of $5 reduces pre-tax and net income, so retained earnings falls $5. Unpaid, so an accrued liability builds $5 (a working-capital source). Net income falls $5 but the $5 accrued build offsets it in CFO, so cash is unchanged. Liabilities rise $5 and equity falls $5, netting to zero on the right side — assets are flat and the balance sheet still ties.",
+    note: "Net income falls $5 but no cash leaves. The accrued liability absorbs it, and on the L&E side the +$5 liability and −$5 equity cancel.",
+  },
+  {
+    q: "Inventory is written down by $8. Ignore taxes.",
+    key: { cogs: -8, grossProfit: -8, ebit: -8, pretax: -8, netIncome: -8,
+           inventory: -8, caTotal: -8, assetsTotal: -8, retained: -8, leTotal: -8,
+           cfNi: -8, cfWc: 8, cfo: 0, cfEnd: 0, cash: 0 },
+    why: "The $8 write-down is a non-cash expense (here through COGS), cutting net income and retained earnings $8. Inventory and total assets fall $8. In CFO the −$8 net income is offset by the $8 inventory reduction (a working-capital source), so cash is unchanged.",
+    note: "Expense with no cash out — inventory itself shrinks $8, and the CFO working-capital release offsets the net income hit.",
+  },
+  {
+    q: "Issue $75 of common stock for cash.",
+    key: { cash: 75, caTotal: 75, assetsTotal: 75, commonStock: 75, leTotal: 75,
+           cff: 75, cfEnd: 75 },
+    why: "Cash (asset) and common stock & APIC (equity) both rise $75. No income effect. It's a financing inflow, lifting CFF and net change in cash by $75.",
+    note: "An equity raise, not debt or revenue. Cash and common stock each rise $75 through financing.",
+  },
+  {
+    q: "Use $20 of excess free cash flow to sweep down debt early.",
+    key: { cash: -20, caTotal: -20, assetsTotal: -20, debtBal: -20, leTotal: -20,
+           cfDebt: -20, cff: -20, cfEnd: -20,
+           debtSweep: -20, debtEnd: -20, debtRepay: -20 },
+    why: "A cash sweep is an optional prepayment: cash and debt fall $20, assets and liabilities both down, equity flat. Financing outflow lowers CFF and net change in cash $20. On the debt schedule the sweep line rises (a −20 change) and the ending balance falls $20.",
+    note: "Like a repayment but through the sweep line on the debt schedule. Cash and debt each fall $20.",
+  },
+];
+
+function ImpactQuiz() {
+  const [order, setOrder] = useState(() => shuffle([...Array(IMPACT.length).keys()]));
+  const [idx, setIdx] = useState(0);
+  const [ans, setAns] = useState({});       // id -> { sign: 1|-1, mag: string }
+  const [checked, setChecked] = useState(false);
+  const [hint, setHint] = useState(null);
+  const [score, setScore] = useState({ right: 0, total: 0 });
+
+  const qi = order[idx];
+  const q = IMPACT[qi];
+  const key = q.key;
+  // lines that must move (nonzero in key)
+  const requiredMoves = Object.entries(key).filter(([, v]) => v !== 0).map(([k]) => k);
+
+  // signed value a user has entered for an id (0 if untouched/blank)
+  function signed(id) {
+    const a = ans[id];
+    if (!a || a.mag === "" || a.mag === undefined) return 0;
+    const n = Number(a.mag);
+    return Number.isFinite(n) ? a.sign * n : 0;
+  }
+
+  function toggleSign(id) {
+    setAns((a) => {
+      const cur = a[id] || { sign: 1, mag: "" };
+      return { ...a, [id]: { ...cur, sign: cur.sign > 0 ? -1 : 1 } };
+    });
+    setHint(null);
+  }
+  function setMag(id, raw) {
+    // allow digits and one decimal point only
+    const v = raw.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
+    setAns((a) => {
+      const cur = a[id] || { sign: 1, mag: "" };
+      return { ...a, [id]: { ...cur, mag: v } };
+    });
+    setHint(null);
+  }
+
+  function giveHint() {
+    const wrong = requiredMoves.find((id) => Math.abs(signed(id) - key[id]) > 1e-9);
+    setHint(wrong || null);
+  }
+
+  function check() {
+    // grade every line that has a key entry OR that the user touched
+    const ids = new Set([...Object.keys(key), ...Object.keys(ans).filter((id) => ans[id] && ans[id].mag !== "")]);
+    let right = 0, total = 0;
+    ids.forEach((id) => {
+      const expected = key[id] !== undefined ? key[id] : 0;
+      total += 1;
+      if (Math.abs(signed(id) - expected) < 1e-9) right += 1;
+    });
+    setScore((s) => ({ right: s.right + right, total: s.total + total }));
+    setChecked(true);
+    setHint(null);
+  }
+
+  function next() {
+    if (idx + 1 >= order.length) { setOrder(shuffle([...Array(IMPACT.length).keys()])); setIdx(0); }
+    else setIdx(idx + 1);
+    setAns({}); setChecked(false); setHint(null);
+  }
+
+  const markedCount = Object.keys(ans).filter((id) => ans[id] && ans[id].mag !== "").length;
+
+  return (
+    <div>
+      <Header title="Impact Quiz"
+        sub="Read the transaction, then enter the dollar change on every line that moves: toggle the sign (+ / –) and type the amount. Subtotals and totals count too. Enter the change to the line's value as shown — expenses are negative, so a larger expense is a negative change." />
+
+      <div style={{
+        background: C.card, border: `1px solid ${C.border}`, borderRadius: 12,
+        padding: "16px 18px", marginBottom: 16,
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+          <span style={{ fontFamily: sans, fontSize: 10.5, letterSpacing: 0.6, color: C.mist, fontWeight: 600 }}>
+            TRANSACTION {idx + 1} / {order.length}
+          </span>
+          <span style={{ fontFamily: mono, fontSize: 11, color: C.slate }}>
+            {score.total > 0 ? `${score.right}/${score.total} lines` : "—"}
+          </span>
+        </div>
+        <p style={{ fontFamily: sans, fontSize: 15.5, fontWeight: 500, color: C.ink, lineHeight: 1.5, margin: 0 }}>{q.q}</p>
+        <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+          {!checked ? (
+            <>
+              <button onClick={check} style={btnPrimary}>Check ({markedCount} entered)</button>
+              <button onClick={giveHint} style={btnGhost}>
+                <span style={{ color: C.amber, fontWeight: 700 }}>◆</span>&nbsp; Hint
+              </button>
+            </>
+          ) : (
+            <button onClick={next} style={btnOutline}>Next transaction →</button>
+          )}
+        </div>
+        {hint && !checked && (
+          <p style={{ fontFamily: sans, fontSize: 12, color: C.amber, margin: "10px 0 0", fontWeight: 500 }}>
+            Look at the highlighted line — its amount or sign still isn't right.
+          </p>
+        )}
+      </div>
+
+      {/* the live statements */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16, marginBottom: 16 }}>
+        <StatementTable stmtKey="is" mode="quiz" answers={ans} onSign={toggleSign} onMag={setMag} checked={checked} answerKey={key} hintId={hint} />
+        <StatementTable stmtKey="cf" mode="quiz" answers={ans} onSign={toggleSign} onMag={setMag} checked={checked} answerKey={key} hintId={hint} />
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <StatementTable stmtKey="bs" mode="quiz" answers={ans} onSign={toggleSign} onMag={setMag} checked={checked} answerKey={key} hintId={hint} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
+        <StatementTable stmtKey="dep" mode="quiz" answers={ans} onSign={toggleSign} onMag={setMag} checked={checked} answerKey={key} hintId={hint} />
+        <StatementTable stmtKey="debt" mode="quiz" answers={ans} onSign={toggleSign} onMag={setMag} checked={checked} answerKey={key} hintId={hint} />
+      </div>
+
+      {checked && (
+        <div style={{
+          marginTop: 16, background: C.blueSoft, border: `1px solid ${C.blueLine}`,
+          borderRadius: 10, padding: "14px 16px",
+        }}>
+          <div style={{ fontFamily: sans, fontSize: 10.5, fontWeight: 700, letterSpacing: 0.5, color: C.blue, marginBottom: 5 }}>WALKTHROUGH</div>
+          <p style={{ fontFamily: sans, fontSize: 13, color: C.slate, lineHeight: 1.6, margin: 0 }}>{q.why}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   CASH FLOW SORT
+   ============================================================ */
+const CLASSIFY = [
+  { q: "Recording depreciation for the period", a: 0, why: "Non-cash operating item — added back within CFO." },
+  { q: "Purchasing a new machine", a: 1, why: "Capex is an investing outflow." },
+  { q: "Paying a dividend", a: 2, why: "Returning capital to shareholders is financing." },
+  { q: "Collecting cash from a customer", a: 0, why: "Collecting AR is an operating working-capital flow." },
+  { q: "Borrowing from a bank", a: 2, why: "Debt issuance is a financing inflow." },
+  { q: "Buying short-term marketable securities", a: 1, why: "Investing the firm's cash into securities is investing." },
+  { q: "Paying interest on debt (US GAAP)", a: 0, why: "Under US GAAP, interest paid sits in operating cash flow." },
+  { q: "Repurchasing company stock", a: 2, why: "Buybacks return capital — a financing outflow." },
+  { q: "Selling an old delivery truck", a: 1, why: "Proceeds from disposing of a long-lived asset are investing." },
+  { q: "An increase in accounts payable", a: 0, why: "Stretching payables is an operating working-capital source." },
+  { q: "Issuing new common equity", a: 2, why: "Raising equity capital is a financing inflow." },
+  { q: "Building up inventory", a: 0, why: "Inventory is operating working capital — a use of cash in CFO." },
+  { q: "Acquiring another company for cash", a: 1, why: "Cash paid for acquisitions is an investing outflow." },
+  { q: "Receiving dividends from an equity investment", a: 0, why: "Under US GAAP, dividends and interest received are operating." },
+  { q: "Repaying the principal on a term loan", a: 2, why: "Principal repayment is a financing outflow (the interest portion is operating)." },
+  { q: "Making a loan to another entity", a: 1, why: "Lending out cash is an investing use." },
+  { q: "Prepaying next year's insurance", a: 0, why: "A prepaid build is an operating working-capital use." },
+  { q: "Paying income taxes to the government", a: 0, why: "Income taxes paid are an operating cash flow." },
+];
+const CLASSIFY_OPTS = ["Operating", "Investing", "Financing"];
+
+function CashFlowSort() {
+  const [order, setOrder] = useState(() => shuffle([...Array(CLASSIFY.length).keys()]));
+  const [idx, setIdx] = useState(0);
+  const [pick, setPick] = useState(null);
+  const [score, setScore] = useState({ right: 0, total: 0 });
+  const qi = order[idx];
+  const q = CLASSIFY[qi];
+  const answered = pick !== null;
+
+  function choose(i) {
+    if (answered) return;
+    setPick(i);
+    setScore((s) => ({ right: s.right + (i === q.a ? 1 : 0), total: s.total + 1 }));
+  }
+  function next() {
+    if (idx + 1 >= order.length) { setOrder(shuffle([...Array(CLASSIFY.length).keys()])); setIdx(0); }
+    else setIdx(idx + 1);
+    setPick(null);
+  }
+
+  const tagColor = ["#2f6fb0", "#b5862f", "#5f6b94"];
+
+  return (
+    <div>
+      <Header title="Cash Flow Sort" sub="Classify each item as operating, investing, or financing — the bucket assignments analysts most often slip on." />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
+        <span style={{ fontFamily: sans, fontSize: 10.5, color: C.mist, letterSpacing: 0.6, fontWeight: 600 }}>ITEM {idx + 1} / {order.length}</span>
+        <span style={{ fontFamily: mono, fontSize: 11, color: C.slate }}>{score.total > 0 ? `${score.right}/${score.total}` : "—"}</span>
+      </div>
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
+        <p style={{ fontFamily: sans, fontSize: 16, fontWeight: 500, color: C.ink, lineHeight: 1.5, margin: "0 0 18px" }}>{q.q}</p>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {CLASSIFY_OPTS.map((o, i) => {
+            const isPick = pick === i, isAns = q.a === i;
+            let bg = C.card, bd = C.border, col = C.ink;
+            if (answered) {
+              if (isAns) { bg = C.posSoft; bd = C.posLine; col = C.pos; }
+              else if (isPick) { bg = C.negSoft; bd = C.negLine; col = C.neg; }
+            }
+            return (
+              <button key={i} onClick={() => choose(i)} style={{
+                flex: 1, minWidth: 110, fontFamily: sans, fontSize: 14, fontWeight: 600,
+                background: bg, border: `1px solid ${bd}`, color: answered ? col : tagColor[i],
+                borderRadius: 9, padding: "14px 12px", cursor: answered ? "default" : "pointer",
+                transition: "all .12s",
+              }}>{o}</button>
+            );
+          })}
+        </div>
+        {answered && (
+          <div style={{ marginTop: 16, borderTop: `1px solid ${C.border}`, paddingTop: 14 }}>
+            <p style={{ fontFamily: sans, fontSize: 13, color: C.slate, lineHeight: 1.55, margin: "0 0 12px" }}>{q.why}</p>
+            <button onClick={next} style={btnOutline}>Next item →</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   LINKAGE CHECK
+   ============================================================ */
+const LINKAGE = [
+  { q: "Net income flows from the income statement to which balance sheet line?", opts: ["Cash", "Retained earnings", "Accounts payable", "Common stock"], a: 1, why: "Net income, less dividends, accumulates in retained earnings within equity." },
+  { q: "Which statement's ending figure becomes the cash line on the balance sheet?", opts: ["Income statement", "Cash flow statement", "Debt schedule", "Depreciation schedule"], a: 1, why: "Ending cash from the cash flow statement is carried to the balance sheet — the model's plug." },
+  { q: "D&A appears on the income statement and is added back in which section?", opts: ["Investing", "Financing", "Operating", "Equity"], a: 2, why: "It's a non-cash operating expense, added back at the top of CFO." },
+  { q: "An increase in accounts receivable has what effect on cash flow?", opts: ["Source of cash", "Use of cash", "No effect", "Financing inflow"], a: 1, why: "Revenue booked without collection ties up cash — a use within CFO." },
+  { q: "Interest expense on the income statement is driven by which schedule?", opts: ["Depreciation schedule", "Debt schedule", "Working capital schedule", "Equity schedule"], a: 1, why: "The debt schedule's balance and rate determine interest expense." },
+  { q: "Capex on the cash flow statement increases which balance sheet line?", opts: ["Inventory", "Gross PP&E", "Goodwill", "Accrued liabilities"], a: 1, why: "Capex adds to gross PP&E, raising net PP&E before depreciation." },
+  { q: "An increase in accounts payable is a…", opts: ["Use of cash", "Source of cash", "Income item", "Investing flow"], a: 1, why: "Delaying supplier payment conserves cash — a source within CFO." },
+  { q: "Which line ties the income statement to the start of the cash flow statement?", opts: ["Revenue", "EBIT", "Net income", "Gross profit"], a: 2, why: "CFO begins with net income, then reconciles non-cash and working-capital items." },
+  { q: "On the depreciation schedule, ending net PP&E equals…", opts: ["Gross PP&E + capex", "Gross PP&E − accumulated depreciation", "Beginning PP&E + D&A", "Capex − depreciation"], a: 1, why: "Net PP&E = ending gross PP&E less ending accumulated depreciation." },
+  { q: "A cash sweep on the debt schedule does what to the ending debt balance?", opts: ["Increases it", "Decreases it", "No effect", "Only changes interest"], a: 1, why: "A sweep is an optional prepayment that reduces the ending balance." },
+  { q: "If the balance sheet doesn't balance, the single most common culprit is…", opts: ["Revenue growth too high", "A broken cash-flow-to-cash link or a missing CF offset", "Tax rate wrong", "Too much capex"], a: 1, why: "A missing or mis-signed cash flow item, or a broken link to the cash plug, is the classic imbalance source." },
+  { q: "Dividends paid reduce which equity line?", opts: ["Common stock & APIC", "Retained earnings", "Treasury stock", "Goodwill"], a: 1, why: "Dividends are paid out of retained earnings." },
+  { q: "Mandatory amortization on the debt schedule flows to which cash flow section?", opts: ["Operating", "Investing", "Financing", "It doesn't appear on the CF"], a: 2, why: "Principal repayment is a financing outflow." },
+  { q: "Accumulated depreciation on the balance sheet is best described as…", opts: ["An expense", "A contra-asset", "A liability", "An equity account"], a: 1, why: "It's a contra-asset that reduces gross PP&E to net PP&E." },
+  { q: "An increase in inventory with no change in payables is a…", opts: ["Source of cash", "Use of cash", "Financing flow", "Non-cash item"], a: 1, why: "Building inventory absorbs cash — a working-capital use in CFO." },
+  { q: "The deferred tax liability typically arises because…", opts: ["Dividends exceed income", "Book D&A is less than tax D&A (accelerated)", "Revenue is deferred", "Debt is repaid early"], a: 1, why: "Accelerated tax depreciation defers cash taxes, creating a DTL versus book." },
+  { q: "Total assets must always equal…", opts: ["Net income + equity", "Total liabilities + total equity", "Cash + debt", "Revenue − expenses"], a: 1, why: "The fundamental accounting identity: assets = liabilities + equity." },
+  { q: "Which of these never touches the income statement?", opts: ["Depreciation", "Interest expense", "Dividend payment", "Inventory write-down"], a: 2, why: "Dividends are a distribution of equity, not an expense — they bypass the income statement." },
+];
+
+function LinkageCheck() {
+  const [order, setOrder] = useState(() => shuffle([...Array(LINKAGE.length).keys()]));
+  const [idx, setIdx] = useState(0);
+  const [pick, setPick] = useState(null);
+  const [score, setScore] = useState({ right: 0, total: 0 });
+  const qi = order[idx];
+  const q = LINKAGE[qi];
+  const answered = pick !== null;
+
+  function choose(i) {
+    if (answered) return;
+    setPick(i);
+    setScore((s) => ({ right: s.right + (i === q.a ? 1 : 0), total: s.total + 1 }));
+  }
+  function next() {
+    if (idx + 1 >= order.length) { setOrder(shuffle([...Array(LINKAGE.length).keys()])); setIdx(0); }
+    else setIdx(idx + 1);
+    setPick(null);
+  }
+
+  return (
+    <div>
+      <Header title="Linkage Check" sub="Eighteen questions on how the three statements and supporting schedules connect." />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
+        <span style={{ fontFamily: sans, fontSize: 10.5, color: C.mist, letterSpacing: 0.6, fontWeight: 600 }}>QUESTION {idx + 1} / {order.length}</span>
+        <span style={{ fontFamily: mono, fontSize: 11, color: C.slate }}>{score.total > 0 ? `${score.right}/${score.total}` : "—"}</span>
+      </div>
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
+        <p style={{ fontFamily: sans, fontSize: 16, fontWeight: 500, color: C.ink, lineHeight: 1.5, margin: "0 0 16px" }}>{q.q}</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {q.opts.map((o, i) => {
+            const isPick = pick === i, isAns = q.a === i;
+            let bg = C.card, bd = C.border, col = C.ink, fw = 400;
+            if (answered) {
+              if (isAns) { bg = C.posSoft; bd = C.posLine; col = C.pos; fw = 600; }
+              else if (isPick) { bg = C.negSoft; bd = C.negLine; col = C.neg; }
+            }
+            return (
+              <button key={i} onClick={() => choose(i)} style={{
+                fontFamily: sans, fontSize: 13.5, textAlign: "left", fontWeight: fw,
+                background: bg, border: `1px solid ${bd}`, color: col,
+                borderRadius: 8, padding: "12px 14px", cursor: answered ? "default" : "pointer",
+                transition: "all .12s",
+              }}>{o}</button>
+            );
+          })}
+        </div>
+        {answered && (
+          <div style={{ marginTop: 16, borderTop: `1px solid ${C.border}`, paddingTop: 14 }}>
+            <p style={{ fontFamily: sans, fontSize: 13, color: C.slate, lineHeight: 1.55, margin: "0 0 12px" }}>{q.why}</p>
+            <button onClick={next} style={btnOutline}>Next question →</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- shared bits ---------- */
+function Header({ title, sub }) {
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <h2 style={{ fontFamily: sans, fontSize: 21, fontWeight: 700, color: C.ink, margin: 0, letterSpacing: -0.3 }}>{title}</h2>
+      <p style={{ fontFamily: sans, fontSize: 13, color: C.slate, margin: "5px 0 0", lineHeight: 1.5, maxWidth: 720 }}>{sub}</p>
+    </div>
+  );
+}
+const btnPrimary = { fontFamily: sans, fontSize: 13, fontWeight: 600, background: C.blue, color: "#fff", border: "none", borderRadius: 7, padding: "9px 16px", cursor: "pointer" };
+const btnOutline = { fontFamily: sans, fontSize: 13, fontWeight: 600, background: C.card, color: C.ink, border: `1px solid ${C.ink}`, borderRadius: 7, padding: "9px 16px", cursor: "pointer" };
+const btnGhost = { fontFamily: sans, fontSize: 13, fontWeight: 600, background: C.card, color: C.slate, border: `1px solid ${C.border}`, borderRadius: 7, padding: "9px 16px", cursor: "pointer", display: "inline-flex", alignItems: "center" };
+
+function shuffle(a) {
+  const r = [...a];
+  for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [r[i], r[j]] = [r[j], r[i]]; }
+  return r;
+}
+
+/* ============================================================
+   APP SHELL — left sidebar nav
+   ============================================================ */
+const NAV = [
+  { id: "model", label: "Model Explorer", icon: "▦" },
+  { id: "impact", label: "Impact Quiz", icon: "±" },
+  { id: "classify", label: "Cash Flow Sort", icon: "⇄" },
+  { id: "linkage", label: "Linkage Check", icon: "⚯" },
+];
+
+function App() {
+  const [tab, setTab] = useState("model");
+
+  return (
+    <div style={{ display: "flex", minHeight: "100vh", background: C.bg, fontFamily: sans }}>
+      {/* sidebar */}
+      <aside style={{
+        width: 230, flexShrink: 0, background: C.sidebar,
+        borderRight: `1px solid ${C.border}`, padding: "22px 14px",
+        display: "flex", flexDirection: "column",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "0 8px 20px", marginBottom: 8, borderBottom: `1px solid ${C.border}` }}>
+          <div style={{
+            width: 30, height: 30, borderRadius: 7, background: C.blue,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#fff", fontSize: 15, fontWeight: 700,
+          }}>3S</div>
+          <div>
+            <div style={{ fontFamily: sans, fontSize: 13, fontWeight: 700, color: C.ink, lineHeight: 1.1 }}>Three-Statement</div>
+            <div style={{ fontFamily: sans, fontSize: 9.5, fontWeight: 600, letterSpacing: 1, color: C.mist }}>STUDIO</div>
+          </div>
+        </div>
+
+        <nav style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 8 }}>
+          {NAV.map((n) => {
+            const active = tab === n.id;
+            return (
+              <button key={n.id} onClick={() => setTab(n.id)} style={{
+                display: "flex", alignItems: "center", gap: 11,
+                fontFamily: sans, fontSize: 13.5, fontWeight: active ? 600 : 500,
+                color: active ? C.blue : C.slate,
+                background: active ? C.blueSoft : "transparent",
+                border: "none", borderRadius: 8, padding: "10px 12px",
+                cursor: "pointer", textAlign: "left", transition: "background .12s, color .12s",
+              }}>
+                <span style={{ fontSize: 15, width: 18, textAlign: "center", color: active ? C.blue : C.mist }}>{n.icon}</span>
+                {n.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div style={{ marginTop: "auto", padding: "0 10px" }}>
+          <div style={{ fontFamily: sans, fontSize: 11, color: C.mist, lineHeight: 1.5 }}>
+            Figures are illustrative anchors. Conventions: US GAAP, interest in CFO, pre-tax unless a rate is stated.
+          </div>
+        </div>
+      </aside>
+
+      {/* main */}
+      <main style={{ flex: 1, padding: "30px 36px 70px", overflowX: "hidden" }}>
+        <div style={{ maxWidth: 980, margin: "0 auto" }}>
+          <div style={{ fontFamily: mono, fontSize: 10.5, letterSpacing: 1.5, color: C.mist, marginBottom: 16 }}>ANALYST PREP</div>
+          {tab === "model" && <ModelExplorer />}
+          {tab === "impact" && <ImpactQuiz />}
+          {tab === "classify" && <CashFlowSort />}
+          {tab === "linkage" && <LinkageCheck />}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
