@@ -254,7 +254,88 @@ function setYear() {
   if (y) y.textContent = new Date().getFullYear();
 }
 
+/* ---------- market ticker ---------- */
+// Hardcoded placeholder quotes that look authentic. `chg` is the % change;
+// a negative value renders red with a ▼, positive renders green with a ▲.
+// Swap this array for a live API feed later — the rendering stays the same.
+const TICKER = [
+  { sym: "S&P 500", price: "5,432.10", chg: 0.82 },
+  { sym: "NASDAQ", price: "17,210.45", chg: 1.05 },
+  { sym: "DOW JONES", price: "39,875.30", chg: -0.21 },
+  { sym: "FTSE 100", price: "8,210.60", chg: 0.34 },
+  { sym: "DAX", price: "18,455.20", chg: -0.12 },
+  { sym: "NIKKEI 225", price: "38,920.15", chg: 0.95 },
+  { sym: "VIX", price: "13.45", chg: -3.10 },
+  { sym: "10Y US Treasury", price: "4.28%", chg: 0.65 },
+  { sym: "2Y US Treasury", price: "4.72%", chg: -0.41 },
+  { sym: "USD/GBP", price: "0.7845", chg: 0.12 },
+  { sym: "USD/EUR", price: "0.9210", chg: -0.08 },
+  { sym: "USD/JPY", price: "157.20", chg: 0.45 },
+  { sym: "Gold", price: "2,358.40", chg: 0.67 },
+  { sym: "Silver", price: "30.85", chg: 1.42 },
+  { sym: "Crude Oil (WTI)", price: "78.32", chg: -0.94 },
+  { sym: "Brent Crude", price: "82.65", chg: -0.71 },
+  { sym: "Natural Gas", price: "2.74", chg: 2.15 },
+  { sym: "Bitcoin", price: "67,420.00", chg: 3.28 },
+  { sym: "Ethereum", price: "3,512.75", chg: 2.04 },
+  { sym: "Apple (AAPL)", price: "214.30", chg: 0.58 },
+  { sym: "Microsoft (MSFT)", price: "448.10", chg: 0.91 },
+  { sym: "NVIDIA (NVDA)", price: "122.45", chg: 2.76 },
+  { sym: "Amazon (AMZN)", price: "185.20", chg: -0.33 },
+  { sym: "Tesla (TSLA)", price: "246.80", chg: -1.85 },
+  { sym: "Meta (META)", price: "502.15", chg: 1.12 },
+];
+
+function tickerItem(t) {
+  const item = document.createElement("span");
+  item.className = "ticker-item";
+
+  const sym = document.createElement("span");
+  sym.className = "ticker-symbol";
+  sym.textContent = t.sym;
+
+  const price = document.createElement("span");
+  price.className = "ticker-price";
+  price.textContent = t.price;
+
+  const up = t.chg >= 0;
+  const chg = document.createElement("span");
+  chg.className = "ticker-change " + (up ? "up" : "down");
+  chg.textContent = (up ? "▲ " : "▼ ") + Math.abs(t.chg).toFixed(2) + "%";
+
+  item.append(sym, price, chg);
+  return item;
+}
+
+function tickerSep() {
+  const sep = document.createElement("span");
+  sep.className = "ticker-sep";
+  sep.setAttribute("aria-hidden", "true");
+  sep.textContent = "•";
+  return sep;
+}
+
+function buildTicker() {
+  const track = document.getElementById("ticker-track");
+  if (!track) return;
+  track.innerHTML = "";
+
+  // Two identical groups side by side; CSS shifts the track by -50% so the
+  // second group seamlessly takes the first's place and the loop is invisible.
+  for (let copy = 0; copy < 2; copy++) {
+    const group = document.createElement("span");
+    group.className = "ticker-group";
+    if (copy === 1) group.setAttribute("aria-hidden", "true");
+    TICKER.forEach((t) => {
+      group.appendChild(tickerItem(t));
+      group.appendChild(tickerSep());
+    });
+    track.appendChild(group);
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   render();
+  buildTicker();
   setYear();
 });

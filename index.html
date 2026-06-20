@@ -31,22 +31,12 @@
     </div>
   </header>
 
-  <!-- stats row -->
-  <section class="stats-section" id="stats-section" aria-label="At a glance">
-    <div class="container">
-      <div class="stats-row">
-        <div class="stat">
-          <div class="stat-num" data-target="3">0</div>
-          <div class="stat-label">Tools Built</div>
-        </div>
-        <div class="stat">
-          <div class="stat-num" data-target="12" data-suffix="+">0</div>
-          <div class="stat-label">Quiz Questions Per Tool</div>
-        </div>
-        <div class="stat">
-          <div class="stat-num" data-target="100" data-suffix="+">0</div>
-          <div class="stat-label">Accounting Line Items</div>
-        </div>
+  <!-- live market ticker -->
+  <section class="ticker-band" aria-label="Live market ticker">
+    <div class="ticker-label">Markets</div>
+    <div class="ticker-viewport">
+      <div class="ticker-track" id="ticker-track">
+        <!-- ticker items injected by script.js, duplicated for a seamless loop -->
       </div>
     </div>
   </section>
@@ -54,6 +44,7 @@
   <main class="container">
     <section aria-labelledby="projects-label">
       <h2 id="projects-label" class="section-label">Projects</h2>
+      <p class="section-sub">A growing collection of finance and trading tools</p>
       <!-- featured banner (rendered by script.js) -->
       <div id="featured"></div>
       <!-- remaining smaller cards (rendered by script.js) -->
