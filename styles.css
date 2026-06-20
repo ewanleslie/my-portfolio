@@ -1,10 +1,13 @@
 :root {
   --bg: #ffffff;
   --navy: #0a1628;
+  --navy-2: #1a3a6b;
   --text: #0d1117;
   --muted: #6b7280;
   --border: #e5e7eb;
   --border-dashed: #d1d5db;
+  --tint: #f0f4ff;
+  --divider: rgba(10, 22, 40, 0.18);
   --radius: 10px;
   --max-width: 760px;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -27,6 +30,14 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* gentle whole-page fade-in on first load */
+  opacity: 0;
+  animation: bodyFade 0.4s ease forwards;
+}
+
+@keyframes bodyFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* ---- header stripe ---- */
@@ -64,7 +75,7 @@ body {
 /* ---- hero ---- */
 .hero {
   padding-top: 120px;
-  padding-bottom: 64px;
+  padding-bottom: 56px;
 }
 
 .site-title {
@@ -114,6 +125,88 @@ body {
   }
 }
 
+/* ---- skill tags ---- */
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 30px;
+}
+
+.tag {
+  display: inline-block;
+  padding: 6px 14px;
+  border: 1px solid var(--navy);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  cursor: default;
+  /* hover transition only; the reveal uses a keyframe so the two don't clash */
+  transition: background 0.2s ease, color 0.2s ease;
+  /* hidden until the row scrolls into view */
+  opacity: 0;
+  transform: translateY(20px);
+}
+.tag:hover {
+  background: var(--navy);
+  color: #ffffff;
+}
+.tag-row.in-view .tag {
+  animation: rise 0.4s ease forwards;
+}
+
+/* ---- stats row ---- */
+.stats-section {
+  margin-bottom: 72px;
+  background: var(--tint);
+  border-top: 1px solid var(--navy);
+  border-bottom: 1px solid var(--navy);
+  /* slide-in on scroll */
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.stats-section.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 34px 0;
+}
+
+.stat {
+  flex: 1;
+  text-align: center;
+  padding: 0 12px;
+}
+.stat + .stat {
+  border-left: 1px solid var(--divider);
+}
+
+.stat-num {
+  font-family: var(--mono);
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--navy);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+  margin-top: 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
 /* ---- projects ---- */
 .section-label {
   margin: 0 0 28px;
@@ -126,15 +219,97 @@ body {
   color: var(--navy);
 }
 
+/* featured banner */
+.reveal-featured {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal-featured.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.featured-card {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  padding: 40px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #0a1628 0%, #1a3a6b 100%);
+  text-decoration: none;
+  color: #ffffff;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.featured-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 40px rgba(10, 22, 40, 0.28);
+}
+
+.featured-watermark {
+  position: absolute;
+  top: 6px;
+  right: 26px;
+  font-family: var(--mono);
+  font-size: 80px;
+  font-weight: 700;
+  line-height: 1;
+  color: #ffffff;
+  opacity: 0.06;
+  pointer-events: none;
+  user-select: none;
+}
+
+.featured-title {
+  position: relative;
+  margin: 0 0 10px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+}
+
+.featured-desc {
+  position: relative;
+  max-width: 78%;
+  margin: 0 0 24px;
+  font-size: 15px;
+  color: #cbd5e1;
+}
+
+.featured-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+}
+.featured-link-label {
+  text-decoration: none;
+}
+.featured-card:hover .featured-link-label {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.featured-link .arrow {
+  transition: transform 0.2s ease;
+}
+.featured-card:hover .featured-link .arrow {
+  transform: translateX(4px);
+}
+
+/* smaller cards grid */
 .project-grid {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 16px;
+  margin-top: 16px;
   padding-bottom: 90px;
 }
 
-/* reveal wrapper handles the scroll-in animation (kept separate from
-   the card's own hover transform so the two never fight) */
+/* reveal wrapper for smaller cards (separate from hover transform) */
 .reveal {
   opacity: 0;
   transform: translateY(24px);
@@ -148,6 +323,7 @@ body {
 .card {
   position: relative;
   display: block;
+  height: 100%;
   padding: 28px;
   background: #ffffff;
   border: 1px solid var(--border);
@@ -156,7 +332,6 @@ body {
   color: inherit;
   transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
-
 a.card {
   cursor: pointer;
 }
@@ -210,7 +385,7 @@ a.card:hover .card-link .arrow {
   transform: translateX(4px);
 }
 
-/* ---- coming-soon cards ---- */
+/* coming-soon cards */
 .card--soon {
   border-style: dashed;
   border-color: var(--border-dashed);
@@ -243,23 +418,60 @@ a.card:hover .card-link .arrow {
   font-weight: 600;
 }
 
+/* ---- responsive ---- */
+@media (max-width: 560px) {
+  .site-title {
+    font-size: 42px;
+  }
+  .project-grid {
+    grid-template-columns: 1fr;
+  }
+  .stats-row {
+    padding: 26px 0;
+  }
+  .stat-num {
+    font-size: 34px;
+  }
+  .stat-label {
+    font-size: 10px;
+  }
+  .featured-card {
+    padding: 28px;
+  }
+  .featured-desc {
+    max-width: 100%;
+  }
+  .featured-watermark {
+    font-size: 60px;
+  }
+}
+
 /* ---- reduced motion ---- */
 @media (prefers-reduced-motion: reduce) {
+  body {
+    animation: none;
+    opacity: 1;
+  }
   .site-title,
   .site-tagline,
-  .title-underline {
+  .title-underline,
+  .tag-row.in-view .tag {
     animation: none;
     opacity: 1;
     transform: none;
   }
-  .reveal {
+  .reveal,
+  .reveal-featured,
+  .stats-section {
     opacity: 1;
     transform: none;
     transition: none;
   }
   .card,
   .card-link,
-  .card-link .arrow {
+  .card-link .arrow,
+  .featured-card,
+  .featured-link .arrow {
     transition: none;
   }
 }

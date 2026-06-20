@@ -19,15 +19,45 @@
       <h1 class="site-title">Ewan Leslie</h1>
       <span class="title-underline" aria-hidden="true"></span>
       <p class="site-tagline">A place where I am storing my latest projects. New stuff coming soon!</p>
+
+      <!-- skill tags -->
+      <div class="tag-row" id="tag-row" aria-label="Skills &amp; focus areas">
+        <span class="tag">Assets</span>
+        <span class="tag">Financial Modelling</span>
+        <span class="tag">Macro Events</span>
+        <span class="tag">Data Visualisation</span>
+        <span class="tag">Accounting</span>
+      </div>
     </div>
   </header>
+
+  <!-- stats row -->
+  <section class="stats-section" id="stats-section" aria-label="At a glance">
+    <div class="container">
+      <div class="stats-row">
+        <div class="stat">
+          <div class="stat-num" data-target="3">0</div>
+          <div class="stat-label">Tools Built</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num" data-target="12" data-suffix="+">0</div>
+          <div class="stat-label">Quiz Questions Per Tool</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num" data-target="100" data-suffix="+">0</div>
+          <div class="stat-label">Accounting Line Items</div>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <main class="container">
     <section aria-labelledby="projects-label">
       <h2 id="projects-label" class="section-label">Projects</h2>
-      <div id="projects" class="project-grid">
-        <!-- cards rendered by script.js -->
-      </div>
+      <!-- featured banner (rendered by script.js) -->
+      <div id="featured"></div>
+      <!-- remaining smaller cards (rendered by script.js) -->
+      <div id="projects" class="project-grid"></div>
     </section>
   </main>
 
