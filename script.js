@@ -315,7 +315,9 @@ function tickerSep() {
   return sep;
 }
 
-function buildTicker() {
+let lastTickerCount = -1;
+
+function buildTicker(items = TICKER) {
   const track = document.getElementById("ticker-track");
   if (!track) return;
   track.innerHTML = "";
@@ -326,16 +328,60 @@ function buildTicker() {
     const group = document.createElement("span");
     group.className = "ticker-group";
     if (copy === 1) group.setAttribute("aria-hidden", "true");
-    TICKER.forEach((t) => {
+    items.forEach((t) => {
       group.appendChild(tickerItem(t));
       group.appendChild(tickerSep());
     });
     track.appendChild(group);
   }
+
+  // Only re-baseline the scroll animation when the number of items changes
+  // (e.g. switching from the hardcoded fallback to live data). Routine value
+  // refreshes keep the same count, so the scroll continues without a jump.
+  if (items.length !== lastTickerCount) {
+    track.style.animation = "none";
+    void track.offsetWidth; // force reflow so the restart registers
+    track.style.animation = "";
+    lastTickerCount = items.length;
+  }
+}
+
+// Format a numeric price the way the hardcoded values look: thousands
+// separators and 2 decimals (4 for sub-1 values like some FX rates).
+function formatPrice(value) {
+  const n = typeof value === "number" ? value : parseFloat(value);
+  if (!isFinite(n)) return String(value);
+  const decimals = Math.abs(n) >= 1 ? 2 : 4;
+  return n.toLocaleString("en-US", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
+// Fetch live quotes and rebuild the ticker. On any failure we silently keep
+// whatever is already showing (the hardcoded fallback), so it never breaks.
+async function loadMarketData() {
+  try {
+    const res = await fetch("/api/market-data", { cache: "no-store" });
+    if (!res.ok) throw new Error("status " + res.status);
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) throw new Error("empty payload");
+
+    const items = data.map((d) => ({
+      sym: d.name || d.symbol,
+      price: formatPrice(d.price),
+      chg: typeof d.changePct === "number" ? d.changePct : parseFloat(d.changePct) || 0,
+    }));
+    buildTicker(items);
+  } catch (e) {
+    // keep the existing ticker contents as a fallback
+  }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   render();
-  buildTicker();
+  buildTicker(); // hardcoded values render immediately
+  loadMarketData(); // then swap in live data if the API responds
+  setInterval(loadMarketData, 60000); // refresh every 60s
   setYear();
 });
