@@ -13,17 +13,22 @@
 //
 // The API key is read from process.env.TWELVE_DATA_API_KEY and never exposed.
 
+// Twelve Data's free tier doesn't include index data (S&P 500, NASDAQ, etc.)
+// or some commodity/forex pairs, so for those we fetch a US-listed ETF proxy
+// that IS covered. `symbol` is the actual ticker requested from Twelve Data;
+// `name` is the label shown in the ticker (it notes the proxy ticker so the
+// price level, e.g. SPY ~600 vs the S&P index ~5,500, isn't misleading).
 const SYMBOLS = [
-  { symbol: "SPX", name: "S&P 500" },
-  { symbol: "IXIC", name: "NASDAQ" },
-  { symbol: "DJI", name: "DOW JONES" },
-  { symbol: "FTSE", name: "FTSE 100" },
-  { symbol: "DAX", name: "DAX" },
-  { symbol: "N225", name: "NIKKEI 225" },
-  { symbol: "VIX", name: "VIX" },
+  { symbol: "SPY", name: "S&P 500 (SPY)" },
+  { symbol: "QQQ", name: "NASDAQ 100 (QQQ)" },
+  { symbol: "DIA", name: "Dow Jones (DIA)" },
+  { symbol: "EWU", name: "FTSE / UK (EWU)" },
+  { symbol: "EWG", name: "DAX / Germany (EWG)" },
+  { symbol: "EWJ", name: "Nikkei / Japan (EWJ)" },
+  { symbol: "VIXY", name: "VIX (VIXY)" },
   { symbol: "XAU/USD", name: "Gold" },
-  { symbol: "XAG/USD", name: "Silver" },
-  { symbol: "WTI/USD", name: "Crude Oil (WTI)" },
+  { symbol: "SLV", name: "Silver (SLV)" },
+  { symbol: "USO", name: "Crude Oil (USO)" },
   { symbol: "BTC/USD", name: "Bitcoin" },
   { symbol: "ETH/USD", name: "Ethereum" },
   { symbol: "AAPL", name: "Apple (AAPL)" },
