@@ -7,7 +7,19 @@
   <style>
     html, body, #root { margin: 0; padding: 0; min-height: 100%; }
     body { background: #ffffff; }
+    html[data-theme="dark"] body { background: #0e1116; }
   </style>
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("theme");
+        if (t !== "light" && t !== "dark") {
+          t = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+        document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
   <div id="root"></div>

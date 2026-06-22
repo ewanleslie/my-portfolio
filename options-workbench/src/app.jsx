@@ -17,27 +17,39 @@ import { createRoot } from "react-dom/client";
    ============================================================ */
 
 /* ---------- design tokens ---------- */
-const T = {
-  ground: "#ffffff",   // page / input / control background
-  panel: "#f7f9fc",    // panel surface
-  panelHi: "#eef2f7",  // raised surface / inactive control
-  line: "#e2e8f0",     // hairline border
-  lineHi: "#cbd5e1",   // stronger border
-  ink: "#0a1628",      // navy — primary text
-  inkDim: "#5b6673",   // secondary text
-  inkFaint: "#94a3b8", // tertiary / labels
-  pos: "#16a34a",      // green — profit / correct / live up
-  posDim: "#dcfce7",   // light green tint (backgrounds)
-  neg: "#dc2626",      // red — loss / wrong
-  negDim: "#fee2e2",   // light red tint (backgrounds)
-  accent: "#0a1628",   // navy — primary active accent
-  accentDim: "#e8edf5",// light navy tint (active backgrounds)
-  live: "#16a34a",     // green — sliders & live numeric pop
-  call: "#2f6fb0",     // blue — call legs
-  put: "#9333ea",      // purple — put legs
+const FONTS = {
   mono: "'SF Mono','JetBrains Mono','Fira Code',ui-monospace,Menlo,monospace",
   sans: "'Inter',system-ui,-apple-system,sans-serif",
 };
+// Light theme — site white/navy with green/red accents.
+const T_LIGHT = {
+  ground: "#ffffff", panel: "#f7f9fc", panelHi: "#eef2f7",
+  line: "#e2e8f0", lineHi: "#cbd5e1",
+  ink: "#0a1628", inkDim: "#5b6673", inkFaint: "#94a3b8",
+  pos: "#16a34a", posDim: "#dcfce7", neg: "#dc2626", negDim: "#fee2e2",
+  accent: "#0a1628", accentDim: "#e8edf5", live: "#16a34a",
+  call: "#2f6fb0", put: "#9333ea", ...FONTS,
+};
+// Dark theme — dark surfaces, light text, blue accent, same green/red.
+const T_DARK = {
+  ground: "#0e1116", panel: "#161b22", panelHi: "#1c232c",
+  line: "#2a323d", lineHi: "#3a4452",
+  ink: "#e6edf3", inkDim: "#8b95a1", inkFaint: "#5a636e",
+  pos: "#3fb68b", posDim: "#16301f", neg: "#e5534b", negDim: "#3a2422",
+  accent: "#5aa9e6", accentDim: "#16263a", live: "#3fb68b",
+  call: "#5aa9e6", put: "#c98bdb", ...FONTS,
+};
+// Mutable working palette; App reassigns it from the active theme each render.
+const T = { ...T_LIGHT };
+
+function getInitialTheme() {
+  try {
+    const t = localStorage.getItem("theme");
+    if (t === "light" || t === "dark") return t;
+    if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
+  } catch (e) {}
+  return "light";
+}
 
 /* ---------- math ---------- */
 function erf(x) {
@@ -92,6 +104,16 @@ const fmtUSD = (n, d = 2) => (n < 0 ? "-$" : "$") + fmt(Math.abs(n), d);
 
 /* ============================================================ */
 function OptionsWorkbench() {
+  const [theme, setTheme] = useState(getInitialTheme);
+  // reassign the working palette before any child renders this pass
+  Object.assign(T, theme === "dark" ? T_DARK : T_LIGHT);
+  useEffect(() => {
+    try { localStorage.setItem("theme", theme); } catch (e) {}
+    document.documentElement.setAttribute("data-theme", theme);
+    document.body.style.background = T.ground;
+  }, [theme]);
+  const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
+
   const [tab, setTab] = useState("explore");
   const tabs = [
     ["explore", "Explore", "payoff & greeks"],
@@ -101,6 +123,16 @@ function OptionsWorkbench() {
 
   return (
     <div style={{ background: T.ground, color: T.ink, fontFamily: T.sans, minHeight: "100vh", padding: "0 0 60px" }}>
+      <button onClick={toggleTheme} aria-label="Toggle dark mode"
+        title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        style={{
+          position: "fixed", top: 16, right: 18, zIndex: 50, width: 38, height: 38, borderRadius: "50%",
+          border: `1px solid ${T.line}`, background: T.panel, color: T.accent, fontSize: 17, lineHeight: 1,
+          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
+        }}>
+        {theme === "dark" ? "☀" : "☾"}
+      </button>
       <style>{`
         * { box-sizing: border-box; }
         @media (prefers-reduced-motion: reduce){ *{transition:none!important;animation:none!important} }
@@ -531,9 +563,9 @@ function DrillTerms() {
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === "Enter" && submit(input)}
             placeholder="type your answer…"
-            style={inputStyle} />
+            style={inputStyle()} />
           <button className="ow-btn" disabled={!!result || !input.trim()} onClick={() => submit(input)}
-            style={primaryBtn}>Check</button>
+            style={primaryBtn()}>Check</button>
         </div>
       )}
 
@@ -595,8 +627,8 @@ function DrillMath() {
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === "Enter" && submit()}
           placeholder={q.placeholder || "enter value…"}
-          style={inputStyle} />
-        <button className="ow-btn" disabled={!!result || !input.trim()} onClick={submit} style={primaryBtn}>Check</button>
+          style={inputStyle()} />
+        <button className="ow-btn" disabled={!!result || !input.trim()} onClick={submit} style={primaryBtn()}>Check</button>
       </div>
 
       {result && (
@@ -611,7 +643,7 @@ function DrillMath() {
             </div>
             <div style={{ fontSize: 13, color: T.inkDim, lineHeight: 1.55 }} dangerouslySetInnerHTML={{ __html: q.explain }} />
           </div>
-          <button className="ow-btn" onClick={() => regen(level)} style={{ ...primaryBtn, marginTop: 12, width: "100%" }}>Next question →</button>
+          <button className="ow-btn" onClick={() => regen(level)} style={{ ...primaryBtn(), marginTop: 12, width: "100%" }}>Next question →</button>
         </div>
       )}
     </Panel>
@@ -1009,19 +1041,19 @@ function Feedback({ ok, answer, onNext }) {
       <div style={{ padding: "11px 14px", borderRadius: 5, background: ok ? T.posDim : T.negDim, border: `1px solid ${ok ? T.pos : T.neg}`, color: ok ? T.pos : T.neg, fontWeight: 600, fontSize: 14 }}>
         {ok ? "Correct" : <>Not quite — answer: <span style={{ color: T.ink }}>{answer}</span></>}
       </div>
-      <button className="ow-btn" onClick={onNext} style={{ ...primaryBtn, marginTop: 12, width: "100%" }}>Next →</button>
+      <button className="ow-btn" onClick={onNext} style={{ ...primaryBtn(), marginTop: 12, width: "100%" }}>Next →</button>
     </div>
   );
 }
 
-const inputStyle = {
+const inputStyle = () => ({
   flex: 1, background: T.ground, border: `1px solid ${T.lineHi}`, borderRadius: 5,
   color: T.ink, padding: "11px 14px", fontSize: 15, fontFamily: T.mono, outline: "none",
-};
-const primaryBtn = {
+});
+const primaryBtn = () => ({
   background: T.accent, color: T.ground, border: "none", borderRadius: 5,
   padding: "11px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer",
-};
+});
 
 /* generic line chart for greeks/decay */
 function LineChart({ pts, xLabel, yLabel, markerX, flipX, floor, floorLabel }) {

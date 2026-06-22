@@ -2,7 +2,7 @@
 // Build with:  npm install && npm run build
 // Produces ../bundle.js (React bundled in, minified). Do not edit bundle.js by hand.
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 
 /* ============================================================
@@ -23,14 +23,33 @@ import { createRoot } from "react-dom/client";
      negSoft   #f7ebea
      amber     #b5862f   category / caution
    ============================================================ */
-const C = {
+const C_LIGHT = {
   bg: "#f4f6f9", sidebar: "#fbfcfd", card: "#ffffff", border: "#e6e9ee",
   ink: "#1f2937", slate: "#5b6673", mist: "#8a929c",
   blue: "#2f6fb0", blueSoft: "#eaf1f8", blueLine: "#cfe0f0",
   pos: "#2f8a5b", posSoft: "#e8f3ec", posLine: "#cfe6d8",
   neg: "#c0504a", negSoft: "#f7ebea", negLine: "#ecd4d2",
-  amber: "#b5862f",
+  amber: "#b5862f", linkRow: "#f3f7fb",
 };
+const C_DARK = {
+  bg: "#0e1116", sidebar: "#11161d", card: "#161b22", border: "#2a323d",
+  ink: "#e6edf3", slate: "#aab4c0", mist: "#8b95a1",
+  blue: "#5aa9e6", blueSoft: "#16263a", blueLine: "#244463",
+  pos: "#3fb68b", posSoft: "#16301f", posLine: "#1f5138",
+  neg: "#e5534b", negSoft: "#3a2422", negLine: "#5e3531",
+  amber: "#d9a441", linkRow: "#141d2a",
+};
+// Mutable working palette; App reassigns it from the active theme each render.
+const C = { ...C_LIGHT };
+
+function getInitialTheme() {
+  try {
+    const t = localStorage.getItem("theme");
+    if (t === "light" || t === "dark") return t;
+    if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
+  } catch (e) {}
+  return "light";
+}
 const sans = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 const mono = "'SF Mono', ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace";
 
@@ -259,7 +278,7 @@ function StatementTable(props) {
 
           let rowBg = "transparent", rowBorder = "transparent";
           if (mode === "explore") {
-            rowBg = isSelected ? C.blueSoft : isLinked ? "#f3f7fb" : "transparent";
+            rowBg = isSelected ? C.blueSoft : isLinked ? C.linkRow : "transparent";
             rowBorder = isSelected ? C.blueLine : "transparent";
           } else if (mode === "quiz") {
             if (graded) { rowBg = isCorrect ? C.posSoft : C.negSoft; rowBorder = isCorrect ? C.posLine : C.negLine; }
@@ -595,13 +614,13 @@ function ImpactQuiz() {
         <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
           {!checked ? (
             <>
-              <button onClick={check} style={btnPrimary}>Check ({markedCount} entered)</button>
-              <button onClick={giveHint} style={btnGhost}>
+              <button onClick={check} style={btnPrimary()}>Check ({markedCount} entered)</button>
+              <button onClick={giveHint} style={btnGhost()}>
                 <span style={{ color: C.amber, fontWeight: 700 }}>◆</span>&nbsp; Hint
               </button>
             </>
           ) : (
-            <button onClick={next} style={btnOutline}>Next transaction →</button>
+            <button onClick={next} style={btnOutline()}>Next transaction →</button>
           )}
         </div>
         {hint && !checked && (
@@ -714,7 +733,7 @@ function CashFlowSort() {
         {answered && (
           <div style={{ marginTop: 16, borderTop: `1px solid ${C.border}`, paddingTop: 14 }}>
             <p style={{ fontFamily: sans, fontSize: 13, color: C.slate, lineHeight: 1.55, margin: "0 0 12px" }}>{q.why}</p>
-            <button onClick={next} style={btnOutline}>Next item →</button>
+            <button onClick={next} style={btnOutline()}>Next item →</button>
           </div>
         )}
       </div>
@@ -796,7 +815,7 @@ function LinkageCheck() {
         {answered && (
           <div style={{ marginTop: 16, borderTop: `1px solid ${C.border}`, paddingTop: 14 }}>
             <p style={{ fontFamily: sans, fontSize: 13, color: C.slate, lineHeight: 1.55, margin: "0 0 12px" }}>{q.why}</p>
-            <button onClick={next} style={btnOutline}>Next question →</button>
+            <button onClick={next} style={btnOutline()}>Next question →</button>
           </div>
         )}
       </div>
@@ -813,9 +832,9 @@ function Header({ title, sub }) {
     </div>
   );
 }
-const btnPrimary = { fontFamily: sans, fontSize: 13, fontWeight: 600, background: C.blue, color: "#fff", border: "none", borderRadius: 7, padding: "9px 16px", cursor: "pointer" };
-const btnOutline = { fontFamily: sans, fontSize: 13, fontWeight: 600, background: C.card, color: C.ink, border: `1px solid ${C.ink}`, borderRadius: 7, padding: "9px 16px", cursor: "pointer" };
-const btnGhost = { fontFamily: sans, fontSize: 13, fontWeight: 600, background: C.card, color: C.slate, border: `1px solid ${C.border}`, borderRadius: 7, padding: "9px 16px", cursor: "pointer", display: "inline-flex", alignItems: "center" };
+const btnPrimary = () => ({ fontFamily: sans, fontSize: 13, fontWeight: 600, background: C.blue, color: "#fff", border: "none", borderRadius: 7, padding: "9px 16px", cursor: "pointer" });
+const btnOutline = () => ({ fontFamily: sans, fontSize: 13, fontWeight: 600, background: C.card, color: C.ink, border: `1px solid ${C.ink}`, borderRadius: 7, padding: "9px 16px", cursor: "pointer" });
+const btnGhost = () => ({ fontFamily: sans, fontSize: 13, fontWeight: 600, background: C.card, color: C.slate, border: `1px solid ${C.border}`, borderRadius: 7, padding: "9px 16px", cursor: "pointer", display: "inline-flex", alignItems: "center" });
 
 function shuffle(a) {
   const r = [...a];
@@ -834,10 +853,30 @@ const NAV = [
 ];
 
 function App() {
+  const [theme, setTheme] = useState(getInitialTheme);
+  // reassign the working palette before any child renders this pass
+  Object.assign(C, theme === "dark" ? C_DARK : C_LIGHT);
+  useEffect(() => {
+    try { localStorage.setItem("theme", theme); } catch (e) {}
+    document.documentElement.setAttribute("data-theme", theme);
+    document.body.style.background = C.bg;
+  }, [theme]);
+  const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
+
   const [tab, setTab] = useState("model");
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: C.bg, fontFamily: sans }}>
+      <button onClick={toggleTheme} aria-label="Toggle dark mode"
+        title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        style={{
+          position: "fixed", top: 16, right: 18, zIndex: 50, width: 38, height: 38, borderRadius: "50%",
+          border: `1px solid ${C.border}`, background: C.card, color: C.blue, fontSize: 17, lineHeight: 1,
+          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
+        }}>
+        {theme === "dark" ? "☀" : "☾"}
+      </button>
       {/* sidebar */}
       <aside style={{
         width: 230, flexShrink: 0, background: C.sidebar,

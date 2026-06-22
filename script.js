@@ -259,6 +259,30 @@ function setYear() {
   if (y) y.textContent = new Date().getFullYear();
 }
 
+// Light/dark toggle. The initial theme is set by the inline <head> script;
+// here we wire the button and persist changes to localStorage (shared with
+// the artifact pages so the choice follows the visitor around the site).
+function setupThemeToggle() {
+  const btn = document.getElementById("theme-toggle");
+  if (!btn) return;
+  const root = document.documentElement;
+  const apply = (t) => {
+    root.setAttribute("data-theme", t);
+    btn.textContent = t === "dark" ? "☀" : "☾"; // icon = the mode you switch to
+    btn.setAttribute("aria-pressed", String(t === "dark"));
+    btn.title = t === "dark" ? "Switch to light mode" : "Switch to dark mode";
+  };
+  let theme = root.getAttribute("data-theme") === "dark" ? "dark" : "light";
+  apply(theme);
+  btn.addEventListener("click", () => {
+    theme = theme === "dark" ? "light" : "dark";
+    try {
+      localStorage.setItem("theme", theme);
+    } catch (e) {}
+    apply(theme);
+  });
+}
+
 /* ---------- market ticker ---------- */
 // Hardcoded placeholder quotes that look authentic. `chg` is the % change;
 // a negative value renders red with a ▼, positive renders green with a ▲.
@@ -396,6 +420,7 @@ async function loadMarketData() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  setupThemeToggle();
   render();
   buildTicker(); // hardcoded values render immediately
   loadMarketData(); // then swap in live data if the API responds

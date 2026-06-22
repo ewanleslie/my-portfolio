@@ -1,5 +1,7 @@
 :root {
   --bg: #ffffff;
+  --card-bg: #ffffff;
+  --hero-bg: #f9fafb;
   --navy: #0a1628;
   --navy-2: #1a3a6b;
   --text: #0d1117;
@@ -7,11 +9,40 @@
   --border: #e5e7eb;
   --border-dashed: #d1d5db;
   --tint: #f0f4ff;
+  --ticker-price: #374151;
   --divider: rgba(10, 22, 40, 0.18);
   --radius: 10px;
   --max-width: 760px;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --mono: "SF Mono", ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+
+/* dark theme — toggled via data-theme on <html> */
+:root[data-theme="dark"] {
+  --bg: #0e1116;
+  --card-bg: #161b22;
+  --hero-bg: #11161d;
+  --navy: #5aa9e6;          /* accent shifts to a visible blue on dark */
+  --text: #e6edf3;
+  --muted: #8b95a1;
+  --border: #232c38;
+  --border-dashed: #3a4452;
+  --tint: #141b26;
+  --ticker-price: #c9d1d9;
+  --divider: rgba(230, 237, 243, 0.14);
+  color-scheme: dark;
+}
+
+/* smooth the flip between themes */
+body,
+.hero,
+.card,
+.tag,
+.ticker-band,
+.ticker-label,
+.site-footer {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
 }
 
 * {
@@ -55,7 +86,7 @@ body {
 .page-fade {
   position: fixed;
   inset: 0;
-  background: #ffffff;
+  background: var(--bg);
   opacity: 0;
   pointer-events: none;
   z-index: 200;
@@ -64,6 +95,36 @@ body {
 .page-fade.active {
   opacity: 1;
   pointer-events: all;
+}
+
+/* ---- theme toggle (fixed top-right on every page) ---- */
+.theme-toggle {
+  position: fixed;
+  top: 16px;
+  right: 18px;
+  z-index: 300;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--navy);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+.theme-toggle:hover {
+  border-color: var(--navy);
+  transform: translateY(-1px);
+}
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
 }
 
 .container {
@@ -77,7 +138,7 @@ body {
   padding-top: 80px;
   padding-bottom: 48px;
   text-align: left;
-  background: #f9fafb;
+  background: var(--hero-bg);
 }
 
 .site-title {
@@ -140,7 +201,7 @@ body {
   padding: 6px 14px;
   border: 1px solid var(--navy);
   border-radius: 999px;
-  background: #ffffff;
+  background: var(--card-bg);
   color: var(--navy);
   font-size: 12px;
   font-weight: 500;
@@ -154,7 +215,7 @@ body {
 }
 .tag:hover {
   background: var(--navy);
-  color: #ffffff;
+  color: var(--bg);
 }
 .tag-row.in-view .tag {
   animation: rise 0.4s ease forwards;
@@ -230,7 +291,7 @@ body {
 }
 .ticker-price {
   font-size: 13px;
-  color: #374151;
+  color: var(--ticker-price);
 }
 .ticker-change {
   font-size: 12.5px;
@@ -387,7 +448,7 @@ body {
   display: block;
   height: 100%;
   padding: 28px;
-  background: #ffffff;
+  background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   text-decoration: none;
