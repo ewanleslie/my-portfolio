@@ -13,6 +13,7 @@ const projects = [
     description: "Explore option payoffs and Greeks, drill derivatives terms and pricing math, and build multi-leg strategies with Black-Scholes pricing.",
     url: "/options-workbench/index.html",
     linkLabel: "Open Workbench",
+    theme: "green",
   },
 ];
 
@@ -34,6 +35,7 @@ function featuredCard(project, n) {
 
   const a = document.createElement("a");
   a.className = "featured-card";
+  if (project.theme) a.classList.add("featured-card--" + project.theme);
   a.href = project.url;
   a.dataset.navigate = "true";
 
@@ -136,11 +138,8 @@ function render() {
   grid.innerHTML = "";
 
   let n = 1;
-  if (projects.length) {
-    featured.appendChild(featuredCard(projects[0], n++));
-  }
-  // any additional live projects beyond the first become smaller cards
-  for (let i = 1; i < projects.length; i++) grid.appendChild(liveCard(projects[i], n++));
+  // every live project renders as a full-width featured banner
+  projects.forEach((p) => featured.appendChild(featuredCard(p, n++)));
   for (let i = 0; i < COMING_SOON; i++) grid.appendChild(soonCard(n++));
 
   setupReveals();
@@ -177,13 +176,13 @@ function runCountUp(section, instant) {
 function setupReveals() {
   const tagRow = document.getElementById("tag-row");
   const statsSection = document.getElementById("stats-section");
-  const featuredWrap = document.querySelector(".reveal-featured");
+  const featuredWraps = Array.from(document.querySelectorAll(".reveal-featured"));
   const cardReveals = Array.from(document.querySelectorAll("#projects .reveal"));
 
   const targets = [];
   if (tagRow) targets.push(tagRow);
   if (statsSection) targets.push(statsSection);
-  if (featuredWrap) targets.push(featuredWrap);
+  featuredWraps.forEach((f) => targets.push(f));
   cardReveals.forEach((c) => targets.push(c));
 
   // No-motion / no-IO fallback: show everything immediately.
@@ -193,7 +192,7 @@ function setupReveals() {
       statsSection.classList.add("in-view");
       runCountUp(statsSection, true);
     }
-    if (featuredWrap) featuredWrap.classList.add("in-view");
+    featuredWraps.forEach((f) => f.classList.add("in-view"));
     cardReveals.forEach((c) => c.classList.add("in-view"));
     return;
   }
@@ -213,7 +212,7 @@ function setupReveals() {
         } else if (el === statsSection) {
           el.classList.add("in-view");
           runCountUp(el);
-        } else if (el === featuredWrap) {
+        } else if (el.classList.contains("reveal-featured")) {
           el.classList.add("in-view");
         } else {
           // smaller card

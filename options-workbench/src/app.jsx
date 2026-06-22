@@ -18,22 +18,23 @@ import { createRoot } from "react-dom/client";
 
 /* ---------- design tokens ---------- */
 const T = {
-  ground: "#0E1116",
-  panel: "#161B22",
-  panelHi: "#1C232C",
-  line: "#2A323D",
-  lineHi: "#3A4452",
-  ink: "#E6EDF3",
-  inkDim: "#8B95A1",
-  inkFaint: "#5A636E",
-  pos: "#3FB68B",      // P&L positive / correct
-  posDim: "#1E3A33",
-  neg: "#E5534B",      // P&L negative / wrong
-  negDim: "#3A2422",
-  accent: "#E8A33D",   // amber — active state, the one bold color
-  accentDim: "#3A2E18",
-  call: "#5AA9E6",
-  put: "#C98BDB",
+  ground: "#ffffff",   // page / input / control background
+  panel: "#f7f9fc",    // panel surface
+  panelHi: "#eef2f7",  // raised surface / inactive control
+  line: "#e2e8f0",     // hairline border
+  lineHi: "#cbd5e1",   // stronger border
+  ink: "#0a1628",      // navy — primary text
+  inkDim: "#5b6673",   // secondary text
+  inkFaint: "#94a3b8", // tertiary / labels
+  pos: "#16a34a",      // green — profit / correct / live up
+  posDim: "#dcfce7",   // light green tint (backgrounds)
+  neg: "#dc2626",      // red — loss / wrong
+  negDim: "#fee2e2",   // light red tint (backgrounds)
+  accent: "#0a1628",   // navy — primary active accent
+  accentDim: "#e8edf5",// light navy tint (active backgrounds)
+  live: "#16a34a",     // green — sliders & live numeric pop
+  call: "#2f6fb0",     // blue — call legs
+  put: "#9333ea",      // purple — put legs
   mono: "'SF Mono','JetBrains Mono','Fira Code',ui-monospace,Menlo,monospace",
   sans: "'Inter',system-ui,-apple-system,sans-serif",
 };
@@ -104,8 +105,8 @@ function OptionsWorkbench() {
         * { box-sizing: border-box; }
         @media (prefers-reduced-motion: reduce){ *{transition:none!important;animation:none!important} }
         input[type=range]{ -webkit-appearance:none; appearance:none; height:3px; background:${T.line}; border-radius:2px; outline:none; }
-        input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none; width:16px; height:16px; border-radius:50%; background:${T.accent}; cursor:pointer; border:2px solid ${T.ground}; }
-        input[type=range]::-moz-range-thumb{ width:16px; height:16px; border-radius:50%; background:${T.accent}; cursor:pointer; border:2px solid ${T.ground}; }
+        input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none; width:16px; height:16px; border-radius:50%; background:${T.live}; cursor:pointer; border:2px solid ${T.ground}; box-shadow:0 0 0 1px ${T.lineHi}; }
+        input[type=range]::-moz-range-thumb{ width:16px; height:16px; border-radius:50%; background:${T.live}; cursor:pointer; border:2px solid ${T.ground}; box-shadow:0 0 0 1px ${T.lineHi}; }
         .ow-num{ font-family:${T.mono}; font-variant-numeric:tabular-nums; }
         .ow-btn{ cursor:pointer; transition:all .12s ease; }
         .ow-btn:focus-visible{ outline:2px solid ${T.accent}; outline-offset:2px; }
@@ -251,6 +252,11 @@ function Explore() {
   const [mode, setMode] = useState("payoff");
   return (
     <div>
+      <Instructions>
+        <Lead>Explore</Lead> how a single option behaves. Drag the sliders and the chart updates live.
+        Use the sub-tabs for the expiry <Lead>payoff diagram</Lead>, how each <Lead>Greek</Lead> responds to
+        spot, volatility and time, and how value <Lead>decays</Lead> as expiry approaches.
+      </Instructions>
       <SubTabs value={mode} onChange={setMode} options={[["payoff", "Payoff diagram"], ["greeks", "Greeks vs. input"], ["decay", "Time decay"]]} />
       {mode === "payoff" && <ExplorePayoff />}
       {mode === "greeks" && <ExploreGreeks />}
@@ -440,6 +446,11 @@ function Drill() {
   const [mode, setMode] = useState("terms");
   return (
     <div>
+      <Instructions>
+        <Lead>Test yourself.</Lead> <Lead>Definitions &amp; terms</Lead> mixes multiple-choice and typed answers —
+        type a word and press Enter or Check. <Lead>Math drills</Lead> generate fresh numeric problems across three
+        levels (intrinsic &amp; breakeven → parity &amp; spreads → Black-Scholes); enter a precise value to check it.
+      </Instructions>
       <SubTabs value={mode} onChange={setMode} options={[["terms", "Definitions & terms"], ["math", "Math drills"]]} />
       {mode === "terms" && <DrillTerms />}
       {mode === "math" && <DrillMath />}
@@ -756,6 +767,11 @@ function Build() {
 
   return (
     <div>
+      <Instructions>
+        <Lead>Build a strategy.</Lead> Start from a <Lead>template</Lead> or add legs yourself, then edit each leg's
+        right, direction, strike, premium and quantity. Tick <Lead>Price premiums with Black-Scholes</Lead> to
+        fair-value the legs and read net Greeks. The chart sums every leg into one payoff at expiry.
+      </Instructions>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18, alignItems: "center" }}>
         <span style={{ fontSize: 12, color: T.inkDim, marginRight: 4 }}>Template:</span>
         {Object.entries(TEMPLATES).map(([k, v]) => (
@@ -925,7 +941,7 @@ function Slider({ label, value, min, max, step, onChange, unit = "", pct }) {
     <div style={{ marginBottom: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
         <Label nm>{label}</Label>
-        <span className="ow-num" style={{ fontSize: 13, color: T.accent }}>{disp}</span>
+        <span className="ow-num" style={{ fontSize: 13, color: T.live }}>{disp}</span>
       </div>
       <input type="range" min={min} max={max} step={step} value={value} onChange={e => onChange(parseFloat(e.target.value))} style={{ width: "100%" }} />
     </div>
@@ -966,6 +982,17 @@ function GreekBox({ label, value }) {
 }
 function Note({ children }) {
   return <div style={{ marginTop: 14, fontSize: 12.5, lineHeight: 1.55, color: T.inkDim, borderLeft: `2px solid ${T.lineHi}`, paddingLeft: 12 }}>{children}</div>;
+}
+function Instructions({ children }) {
+  return (
+    <div style={{
+      background: T.accentDim, border: `1px solid ${T.line}`, borderLeft: `3px solid ${T.accent}`,
+      borderRadius: 6, padding: "11px 14px", marginBottom: 18, fontSize: 13, lineHeight: 1.55, color: T.inkDim,
+    }}>{children}</div>
+  );
+}
+function Lead({ children }) {
+  return <b style={{ color: T.ink }}>{children}</b>;
 }
 function ScorePill({ score }) {
   const pct = score.total ? Math.round(score.right / score.total * 100) : 0;

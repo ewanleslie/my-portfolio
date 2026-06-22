@@ -293,6 +293,21 @@ body {
   box-shadow: 0 16px 40px rgba(10, 22, 40, 0.28);
 }
 
+/* stack multiple featured banners with breathing room */
+#featured {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* green variant for visual variation between banners */
+.featured-card--green {
+  background: linear-gradient(135deg, #0a2e22 0%, #137a52 100%);
+}
+.featured-card--green:hover {
+  box-shadow: 0 16px 40px rgba(10, 70, 48, 0.30);
+}
+
 .featured-watermark {
   position: absolute;
   top: 6px;
