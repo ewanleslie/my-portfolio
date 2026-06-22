@@ -8,6 +8,12 @@ const projects = [
     url: "/three-statement-studio/index.html",
     linkLabel: "Open Studio",
   },
+  {
+    title: "Options Workbench",
+    description: "Explore option payoffs and Greeks, drill derivatives terms and pricing math, and build multi-leg strategies with Black-Scholes pricing.",
+    url: "/options-workbench/index.html",
+    linkLabel: "Open Workbench",
+  },
 ];
 
 // Number of "Coming Soon" placeholder cards to render after the live ones.
