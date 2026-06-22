@@ -39,14 +39,14 @@ const SYMBOLS = [
   { symbol: "META", name: "Meta (META)" },
 ];
 
-// 6 symbols/call keeps us comfortably under the 8-credit/min free-tier cap and
-// cycles through all 18 in three calls (~3 minutes at the client's 60s poll).
+// 6 symbols/call stays under the ~8-credit/min free-tier cap. Which chunk we
+// return rotates with the clock, so successive client polls (60s apart) get
+// different symbols. The function is fully stateless — Vercel serverless
+// instances are ephemeral and don't share memory, so the *client* accumulates
+// the chunks across its polls (over ~3 cycles it has all 18, then keeps them
+// refreshed). The `order` field lets the client sort into the canonical order.
 const CHUNK_SIZE = 6;
 const NUM_CHUNKS = Math.ceil(SYMBOLS.length / CHUNK_SIZE);
-
-// These persist across warm invocations of the same serverless instance.
-const cache = Object.create(null); // symbol -> result object
-let rotation = 0;
 
 function quoteFor(payload, symbol) {
   if (payload && Object.prototype.hasOwnProperty.call(payload, symbol)) {
@@ -56,16 +56,12 @@ function quoteFor(payload, symbol) {
   return null;
 }
 
-function cachedArray() {
-  return SYMBOLS.map((s) => cache[s.symbol]).filter(Boolean);
-}
-
 module.exports = async function handler(req, res) {
   // allow the static frontend (any origin) to call this endpoint
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  // brief edge cache to dedupe bursts without starving the rotation
-  res.setHeader("Cache-Control", "s-maxage=20, stale-while-revalidate=40");
+  // cache within the minute to dedupe bursts; the chunk changes each minute
+  res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate=30");
 
   if (req.method === "OPTIONS") {
     return res.status(204).end();
@@ -77,10 +73,10 @@ module.exports = async function handler(req, res) {
       return res.status(500).json({ error: "Server is missing TWELVE_DATA_API_KEY." });
     }
 
-    // pick the next rotating chunk of symbols to refresh
-    const idx = rotation % NUM_CHUNKS;
-    rotation += 1;
-    const chunk = SYMBOLS.slice(idx * CHUNK_SIZE, idx * CHUNK_SIZE + CHUNK_SIZE);
+    // rotate the chunk by the clock so each minute returns a different slice
+    const idx = Math.floor(Date.now() / 60000) % NUM_CHUNKS;
+    const offset = idx * CHUNK_SIZE;
+    const chunk = SYMBOLS.slice(offset, offset + CHUNK_SIZE);
 
     const symbolList = chunk.map((s) => s.symbol).join(",");
     const url =
@@ -101,39 +97,34 @@ module.exports = async function handler(req, res) {
       throw new Error(payload.message || "Twelve Data returned an error.");
     }
 
-    // merge this chunk's quotes into the cache
-    chunk.forEach(({ symbol, name }) => {
-      const q = quoteFor(payload, symbol);
-      if (!q || q.status === "error" || q.code) return; // skip unresolved symbols
+    const data = chunk
+      .map(({ symbol, name }, i) => {
+        const q = quoteFor(payload, symbol);
+        if (!q || q.status === "error" || q.code) return null; // skip unresolved
 
-      const price = parseFloat(q.close != null ? q.close : q.price);
-      const change = parseFloat(q.change);
-      const changePct = parseFloat(q.percent_change);
-      if (!isFinite(price)) return;
+        const price = parseFloat(q.close != null ? q.close : q.price);
+        const change = parseFloat(q.change);
+        const changePct = parseFloat(q.percent_change);
+        if (!isFinite(price)) return null;
 
-      const safeChangePct = isFinite(changePct) ? changePct : 0;
-      cache[symbol] = {
-        symbol,
-        name,
-        price,
-        change: isFinite(change) ? change : 0,
-        changePct: safeChangePct,
-        positive: safeChangePct >= 0,
-      };
-    });
+        const safeChangePct = isFinite(changePct) ? changePct : 0;
+        return {
+          symbol,
+          name,
+          price,
+          change: isFinite(change) ? change : 0,
+          changePct: safeChangePct,
+          positive: safeChangePct >= 0,
+          order: offset + i, // canonical position so the client can sort
+        };
+      })
+      .filter(Boolean);
 
-    const data = cachedArray();
     if (data.length === 0) {
-      return res.status(500).json({ error: "No market data is available yet." });
+      return res.status(500).json({ error: "No market data was returned for this batch." });
     }
     return res.status(200).json(data);
   } catch (err) {
-    // On rate-limit or any failure, serve whatever we've cached so far so the
-    // ticker keeps showing data instead of falling back to placeholders.
-    const data = cachedArray();
-    if (data.length > 0) {
-      return res.status(200).json(data);
-    }
     return res
       .status(500)
       .json({ error: err && err.message ? err.message : "Failed to fetch market data." });

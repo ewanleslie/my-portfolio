@@ -358,8 +358,15 @@ function formatPrice(value) {
   });
 }
 
-// Fetch live quotes and rebuild the ticker. On any failure we silently keep
-// whatever is already showing (the hardcoded fallback), so it never breaks.
+// Live quotes accumulate here across polls. The API returns a rotating subset
+// of symbols each call (to stay within the free-tier rate limit), so the page
+// stitches the chunks together and keeps them refreshed. Keyed by symbol.
+const marketCache = {};
+
+// Fetch the current chunk of live quotes, merge it into marketCache, and
+// rebuild the ticker from everything gathered so far. On any failure we
+// silently keep whatever is already showing (live cache or hardcoded
+// fallback), so it never breaks.
 async function loadMarketData() {
   try {
     const res = await fetch("/api/market-data", { cache: "no-store" });
@@ -367,14 +374,19 @@ async function loadMarketData() {
     const data = await res.json();
     if (!Array.isArray(data) || data.length === 0) throw new Error("empty payload");
 
-    const items = data.map((d) => ({
-      sym: d.name || d.symbol,
-      price: formatPrice(d.price),
-      chg: typeof d.changePct === "number" ? d.changePct : parseFloat(d.changePct) || 0,
-    }));
-    buildTicker(items);
+    data.forEach((d) => {
+      marketCache[d.symbol] = {
+        sym: d.name || d.symbol,
+        price: formatPrice(d.price),
+        chg: typeof d.changePct === "number" ? d.changePct : parseFloat(d.changePct) || 0,
+        order: typeof d.order === "number" ? d.order : 999,
+      };
+    });
+
+    const items = Object.values(marketCache).sort((a, b) => a.order - b.order);
+    if (items.length) buildTicker(items);
   } catch (e) {
-    // keep the existing ticker contents as a fallback
+    // keep whatever is already showing
   }
 }
 
