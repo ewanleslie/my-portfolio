@@ -417,9 +417,20 @@ async function loadMarketData() {
 
     const items = Object.values(marketCache).sort((a, b) => a.order - b.order);
     if (items.length) buildTicker(items);
+    updateTimestamp(); // only reached on a successful fetch
   } catch (e) {
-    // keep whatever is already showing
+    // keep whatever is already showing (and leave the timestamp untouched)
   }
+}
+
+// Stamp the ticker with the current HH:MM. Called only after a successful fetch.
+function updateTimestamp() {
+  const el = document.getElementById("ticker-updated");
+  if (!el) return;
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  el.textContent = hh + ":" + mm;
 }
 
 /* ---------- category filters ---------- */
@@ -477,10 +488,64 @@ function setupFilters() {
   });
 }
 
+/* ---------- featured-card interactions ---------- */
+
+// Magnetic hover: the featured card drifts toward the cursor (max ~8px in any
+// direction) and springs back to centre when the cursor leaves. The -4px hover
+// lift is folded in so it doesn't fight the CSS :hover transform.
+function setupMagnetic() {
+  if (prefersReducedMotion) return;
+  const MAX = 8;
+  document.querySelectorAll(".featured-card").forEach((card) => {
+    card.addEventListener("mousemove", (e) => {
+      const r = card.getBoundingClientRect();
+      const nx = (e.clientX - (r.left + r.width / 2)) / (r.width / 2);
+      const ny = (e.clientY - (r.top + r.height / 2)) / (r.height / 2);
+      const dx = Math.max(-1, Math.min(1, nx)) * MAX;
+      const dy = Math.max(-1, Math.min(1, ny)) * MAX;
+      card.style.transform = `translate(${dx.toFixed(1)}px, ${(dy - 4).toFixed(1)}px)`;
+    });
+    card.addEventListener("mouseleave", () => {
+      card.style.transform = ""; // CSS transition eases it back to rest
+    });
+  });
+}
+
+// Scroll parallax: the large watermark numbers drift at a marginally different
+// rate than their card as it moves through the viewport. rAF-throttled.
+function setupParallax() {
+  if (prefersReducedMotion) return;
+  const marks = Array.from(document.querySelectorAll(".featured-watermark"));
+  if (!marks.length) return;
+  let ticking = false;
+  const update = () => {
+    const vh = window.innerHeight || document.documentElement.clientHeight;
+    marks.forEach((m) => {
+      const card = m.closest(".featured-card");
+      if (!card) return;
+      const r = card.getBoundingClientRect();
+      const rel = (r.top + r.height / 2 - vh / 2) / vh; // ~ -0.5 .. 0.5
+      m.style.transform = `translateY(${(rel * 16).toFixed(1)}px)`; // gentle drift
+    });
+    ticking = false;
+  };
+  const onScroll = () => {
+    if (!ticking) {
+      ticking = true;
+      requestAnimationFrame(update);
+    }
+  };
+  window.addEventListener("scroll", onScroll, { passive: true });
+  window.addEventListener("resize", onScroll, { passive: true });
+  update();
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   setupThemeToggle();
   render();
   setupFilters(); // wire the category pills after cards exist
+  setupMagnetic(); // magnetic hover on the featured banners
+  setupParallax(); // watermark parallax on scroll
   buildTicker(); // hardcoded values render immediately
   loadMarketData(); // then swap in live data if the API responds
   setInterval(loadMarketData, 60000); // refresh every 60s

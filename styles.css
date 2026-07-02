@@ -11,6 +11,25 @@
   --tint: #f0f4ff;
   --ticker-price: #374151;
   --divider: rgba(10, 22, 40, 0.18);
+
+  /* 8px spacing scale — regularises vertical rhythm between major sections.
+     Section-gap map:
+       --space-3  ticker -> hero            (.ticker-band margin-bottom)
+       s8 + s2    hero top padding           (.hero padding-top, = 80px)
+       --space-6  hero -> divider            (.hero padding-bottom)
+       --space-5  divider -> projects        (.divider-bar margin-bottom)
+       --space-1  projects label -> subtitle (.section-label margin-bottom)
+       --space-3  subtitle -> cards          (.section-sub margin-bottom)
+       --space-2  banner & card gaps         (.reveal-featured, grid gap/top) */
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-5: 40px;
+  --space-6: 48px;
+  --space-7: 56px;
+  --space-8: 64px;
+
   --radius: 10px;
   --max-width: 760px;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -41,6 +60,7 @@ body,
 .tag,
 .ticker-band,
 .ticker-label,
+.ticker-updated,
 .divider-bar,
 .site-footer {
   transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
@@ -136,8 +156,8 @@ body {
 
 /* ---- hero ---- */
 .hero {
-  padding-top: 80px;
-  padding-bottom: 48px;
+  padding-top: calc(var(--space-8) + var(--space-2)); /* 80px */
+  padding-bottom: var(--space-6);
   text-align: left;
   background: var(--hero-bg);
 }
@@ -233,8 +253,8 @@ body {
 .divider-bar {
   display: flex;
   justify-content: center;
-  padding: 16px 24px;
-  margin-bottom: 40px;
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-5);
   background: var(--tint);
   border-top: 1px solid var(--navy);
   border-bottom: 1px solid var(--navy);
@@ -244,7 +264,7 @@ body {
 .ticker-band {
   display: flex;
   align-items: stretch;
-  margin-bottom: 24px;
+  margin-bottom: var(--space-3);
   background: var(--tint);
   border-top: 1px solid var(--navy);
   border-bottom: 1px solid var(--navy);
@@ -264,6 +284,21 @@ body {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--navy);
+  z-index: 1;
+}
+
+/* last-updated stamp — subtle, mirrors the MARKETS label on the right edge */
+.ticker-updated {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: var(--tint);
+  border-left: 1px solid var(--navy);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
   z-index: 1;
 }
 
@@ -330,7 +365,7 @@ body {
 
 /* ---- projects ---- */
 .section-label {
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-1);
   padding-left: 8px;
   border-left: 3px solid var(--navy);
   font-size: 11px;
@@ -341,7 +376,7 @@ body {
 }
 
 .section-sub {
-  margin: 0 0 28px;
+  margin: 0 0 var(--space-3); /* was 28px — snapped to the 24px step */
   font-size: 14px;
   color: var(--muted);
 }
@@ -350,7 +385,7 @@ body {
 .reveal-featured {
   opacity: 0;
   transform: translateY(30px);
-  margin-bottom: 16px;
+  margin-bottom: var(--space-2);
   transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1),
     max-height 0.3s ease, margin 0.3s ease;
 }
@@ -366,7 +401,7 @@ body {
   position: relative;
   display: block;
   overflow: hidden;
-  padding: 40px;
+  padding: var(--space-5);
   border-radius: 14px;
   background: linear-gradient(135deg, #0a1628 0%, #1a3a6b 100%);
   text-decoration: none;
@@ -451,8 +486,8 @@ body {
 .project-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-  margin-top: 16px;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
   padding-bottom: 90px;
 }
 
