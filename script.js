@@ -7,6 +7,7 @@ const projects = [
     description: "Interactive model explorer and quiz covering income statement, balance sheet, cash flow, and supporting schedules.",
     url: "/three-statement-studio/index.html",
     linkLabel: "Open Studio",
+    categories: "Financial Modelling, Accounting",
   },
   {
     title: "Options Workbench",
@@ -14,6 +15,7 @@ const projects = [
     url: "/options-workbench/index.html",
     linkLabel: "Open Workbench",
     theme: "green",
+    categories: "Derivatives, Financial Modelling",
   },
 ];
 
@@ -32,6 +34,7 @@ function pad(n) {
 function featuredCard(project, n) {
   const wrap = document.createElement("div");
   wrap.className = "reveal-featured";
+  wrap.dataset.categories = project.categories || "";
 
   const a = document.createElement("a");
   a.className = "featured-card";
@@ -419,9 +422,65 @@ async function loadMarketData() {
   }
 }
 
+/* ---------- category filters ---------- */
+function projectCards() {
+  return document.querySelectorAll("#featured > .reveal-featured, #projects > .reveal");
+}
+
+// Smoothly collapse or expand a card wrapper: fade the inner card and animate
+// its height from the real pixel height to 0 (and back) so the grid reflows.
+function setCardHidden(card, hidden) {
+  const isHidden = card.classList.contains("card-hidden");
+  if (hidden === isHidden) return;
+
+  if (hidden) {
+    card.style.overflow = "hidden";
+    card.style.maxHeight = card.scrollHeight + "px";
+    void card.offsetHeight; // reflow so the collapse animates from the real height
+    card.classList.add("card-hidden");
+    card.style.maxHeight = "0px";
+  } else {
+    card.classList.remove("card-hidden");
+    card.style.overflow = "hidden";
+    card.style.maxHeight = card.scrollHeight + "px";
+    const onEnd = (e) => {
+      if (e.propertyName !== "max-height") return;
+      card.style.maxHeight = "";
+      card.style.overflow = "";
+      card.removeEventListener("transitionend", onEnd);
+    };
+    card.addEventListener("transitionend", onEnd);
+  }
+}
+
+function setupFilters() {
+  const pills = Array.from(document.querySelectorAll("#tag-row .tag"));
+  if (!pills.length) return;
+
+  const apply = (filter) => {
+    projectCards().forEach((card) => {
+      const cats = (card.dataset.categories || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const match = filter === "all" || cats.includes(filter);
+      setCardHidden(card, !match);
+    });
+  };
+
+  pills.forEach((pill) => {
+    pill.addEventListener("click", () => {
+      pills.forEach((p) => p.classList.remove("active"));
+      pill.classList.add("active");
+      apply(pill.dataset.filter);
+    });
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   setupThemeToggle();
   render();
+  setupFilters(); // wire the category pills after cards exist
   buildTicker(); // hardcoded values render immediately
   loadMarketData(); // then swap in live data if the API responds
   setInterval(loadMarketData, 60000); // refresh every 60s

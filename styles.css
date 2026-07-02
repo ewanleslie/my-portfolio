@@ -41,6 +41,7 @@ body,
 .tag,
 .ticker-band,
 .ticker-label,
+.divider-bar,
 .site-footer {
   transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
 }
@@ -188,12 +189,13 @@ body {
   }
 }
 
-/* ---- skill tags ---- */
+/* ---- category filter pills (in the divider bar) ---- */
 .tag-row {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 10px;
-  margin-top: 30px;
+  margin: 0;
 }
 
 .tag {
@@ -203,10 +205,11 @@ body {
   border-radius: 999px;
   background: var(--card-bg);
   color: var(--navy);
+  font-family: inherit;
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.03em;
-  cursor: default;
+  cursor: pointer;
   /* hover transition only; the reveal uses a keyframe so the two don't clash */
   transition: background 0.2s ease, color 0.2s ease;
   /* hidden until the row scrolls into view */
@@ -217,8 +220,24 @@ body {
   background: var(--navy);
   color: var(--bg);
 }
+/* active filter — filled navy with contrasting text */
+.tag.active {
+  background: var(--navy);
+  color: var(--bg);
+}
 .tag-row.in-view .tag {
   animation: rise 0.4s ease forwards;
+}
+
+/* ---- divider bar (matched pair with the ticker) ---- */
+.divider-bar {
+  display: flex;
+  justify-content: center;
+  padding: 16px 24px;
+  margin-bottom: 40px;
+  background: var(--tint);
+  border-top: 1px solid var(--navy);
+  border-bottom: 1px solid var(--navy);
 }
 
 /* ---- live market ticker ---- */
@@ -331,7 +350,12 @@ body {
 .reveal-featured {
   opacity: 0;
   transform: translateY(30px);
-  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  margin-bottom: 16px;
+  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    max-height 0.3s ease, margin 0.3s ease;
+}
+.reveal-featured:last-child {
+  margin-bottom: 0;
 }
 .reveal-featured.in-view {
   opacity: 1;
@@ -347,18 +371,18 @@ body {
   background: linear-gradient(135deg, #0a1628 0%, #1a3a6b 100%);
   text-decoration: none;
   color: #ffffff;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.3s ease;
 }
 .featured-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 16px 40px rgba(10, 22, 40, 0.28);
 }
 
-/* stack multiple featured banners with breathing room */
+/* stack multiple featured banners with breathing room (margin, not gap,
+   so a filtered-out banner collapses its spacing too) */
 #featured {
   display: flex;
   flex-direction: column;
-  gap: 16px;
 }
 
 /* green variant for visual variation between banners */
@@ -436,11 +460,25 @@ body {
 .reveal {
   opacity: 0;
   transform: translateY(24px);
-  transition: opacity 0.55s ease, transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.55s ease, transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    max-height 0.3s ease, margin 0.3s ease;
 }
 .reveal.in-view {
   opacity: 1;
   transform: translateY(0);
+}
+
+/* ---- category filter: fade + collapse (matching cards animate back the same way) ---- */
+.reveal.card-hidden,
+.reveal-featured.card-hidden {
+  max-height: 0;
+  margin: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.reveal.card-hidden > .card,
+.reveal-featured.card-hidden > .featured-card {
+  opacity: 0;
 }
 
 .card {
@@ -453,7 +491,7 @@ body {
   border-radius: var(--radius);
   text-decoration: none;
   color: inherit;
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.3s ease;
 }
 a.card {
   cursor: pointer;

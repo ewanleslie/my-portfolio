@@ -28,30 +28,32 @@
   <!-- white overlay used for the fade-out on navigation -->
   <div class="page-fade" aria-hidden="true"></div>
 
-  <header class="hero">
-    <div class="container">
-      <h1 class="site-title">Ewan Leslie</h1>
-      <span class="title-underline" aria-hidden="true"></span>
-      <p class="site-tagline">A place where I am storing my latest projects. New stuff coming soon!</p>
-
-      <!-- skill tags -->
-      <div class="tag-row" id="tag-row" aria-label="Skills &amp; focus areas">
-        <span class="tag">Assets</span>
-        <span class="tag">Financial Modelling</span>
-        <span class="tag">Macro Events</span>
-        <span class="tag">Data Visualisation</span>
-        <span class="tag">Accounting</span>
-      </div>
-    </div>
-  </header>
-
-  <!-- live market ticker -->
+  <!-- live market ticker — full-bleed banner flush at the very top -->
   <section class="ticker-band" aria-label="Live market ticker">
     <div class="ticker-label">Markets</div>
     <div class="ticker-viewport">
       <div class="ticker-track" id="ticker-track">
         <!-- ticker items injected by script.js, duplicated for a seamless loop -->
       </div>
+    </div>
+  </section>
+
+  <header class="hero">
+    <div class="container">
+      <h1 class="site-title">Ewan Leslie</h1>
+      <span class="title-underline" aria-hidden="true"></span>
+      <p class="site-tagline">A place where I am storing my latest projects. New stuff coming soon!</p>
+    </div>
+  </header>
+
+  <!-- divider bar — matched pair with the ticker; holds the category filters -->
+  <section class="divider-bar" aria-label="Project filters">
+    <div class="tag-row" id="tag-row" role="group" aria-label="Filter projects by category">
+      <button type="button" class="tag active" data-filter="all">All</button>
+      <button type="button" class="tag" data-filter="Financial Modelling">Financial Modelling</button>
+      <button type="button" class="tag" data-filter="Accounting">Accounting</button>
+      <button type="button" class="tag" data-filter="Derivatives">Derivatives</button>
+      <button type="button" class="tag" data-filter="Markets">Markets</button>
     </div>
   </section>
 
